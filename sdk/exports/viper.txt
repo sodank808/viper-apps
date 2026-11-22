@@ -1,0 +1,82 @@
+# Viper's own functions for ELF apps: the API in sdk/include/viper_app.h,
+# implemented in components/system/src/elf_app.cpp, elf_audio.cpp and
+# elf_link.cpp (link play, sdk/include/viper_link.h).
+#
+# tool/gen_exports.py turns the lists in this folder into the loader's export
+# table, and tool/check_app_elf.py checks apps against them. A line is a name the
+# app calls, optionally followed by "= <firmware symbol>" when the firmware
+# provides it under another name, and by "if CONFIG_<option>" when it's only
+# exported from firmware built with that option.
+#
+# Every name here is ABI: an installed app that calls it stops loading if it
+# goes. One function per job (docs/plans/game_api_consolidation.md).
+
+# The running app
+viper_app_path
+viper_app_lvgl_path
+viper_app_exit
+viper_app_handle_back
+viper_app_launch
+viper_app_argc
+viper_app_arg
+viper_app_keep_awake
+
+# The screen, for VIPER_RENDER_VIDEO_BLIT apps
+viper_display_width
+viper_display_height
+viper_frame_begin
+viper_frame_mark_dirty
+viper_frame_end
+viper_frame_set_indexed
+
+# Time, random numbers, haptics and the log
+viper_time_us
+viper_time_local
+viper_random
+viper_haptic
+viper_log
+
+# The IMU
+viper_imu_available
+viper_imu_accel
+viper_imu_gyro
+
+# Battery and memory, for status readouts
+viper_battery_level
+viper_battery_charging
+viper_memory
+
+# Sound
+viper_audio_tap_install
+viper_audio_tap_remove
+viper_audio_sample_rate
+
+# Settings and save files (docs/design/app_storage.md)
+viper_prefs_available
+viper_prefs_get_int
+viper_prefs_set_int
+viper_prefs_get_float
+viper_prefs_set_float
+viper_prefs_get_string
+viper_prefs_set_string
+viper_prefs_get_blob
+viper_prefs_set_blob
+viper_prefs_remove
+viper_data_path
+viper_data_read
+viper_data_write
+viper_data_remove
+
+# Link play (viper_link.h, docs/design/multiplayer.md "ELF apps")
+viper_link_open
+viper_link_close
+viper_link_lobby
+viper_link_start
+viper_link_set_settings
+viper_link_rematch
+viper_link_status
+viper_link_now_us
+viper_link_send
+viper_link_poll
+viper_link_sync_send
+viper_link_sync_receive

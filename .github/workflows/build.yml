@@ -1,0 +1,25 @@
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # The ESP-IDF version in sdk/VERSION
+    container: espressif/idf:v5.5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build every app
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          make
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viper-apps
+          path: out/
+          if-no-files-found: ignore

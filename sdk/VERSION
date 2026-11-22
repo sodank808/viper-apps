@@ -1,0 +1,4 @@
+sdk 2.0.0
+abi 2 (firmware runs 2 to 2)
+esp-idf 5.5
+lvgl 9.3.0

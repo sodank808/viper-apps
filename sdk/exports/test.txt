@@ -1,0 +1,17 @@
+# Exports for the loader's test programs, not part of the app API: they're
+# not in viper_app.h, and apps declare them themselves. Format: see viper.txt.
+
+# hello_world (elf test): a firmware function, and a firmware variable, which
+# reaches the app through an R_XTENSA_GLOB_DAT relocation
+# (components/system/src/elf_loader_service.cpp)
+viper_test
+viper_elf_test_value
+
+# gfx_bench: gfx's drawing compiled into the firmware, timed against the app's
+# own copy (components/gfx/include/gfx/benchmark.hpp)
+viper_gfx_bench
+
+# shared_mem_test: the shared memory pool the emulators use
+# (components/shared_memory). Only for firmware that runs .shared_iram code.
+shared_mem_get_base if CONFIG_ELF_LOADER_SHARED_IRAM
+shared_mem_get_size if CONFIG_ELF_LOADER_SHARED_IRAM

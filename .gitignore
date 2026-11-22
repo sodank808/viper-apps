@@ -1,0 +1,12 @@
+# Per-app ESP-IDF build output
+build/
+managed_components/
+dependencies.lock
+sdkconfig
+sdkconfig.old
+# make's install folder
+out/
+.DS_Store
+.vscode/
+.cache/
+__pycache__/

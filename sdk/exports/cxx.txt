@@ -1,0 +1,65 @@
+# The C++ runtime for ELF apps. Format: see viper.txt. Apps are built like the
+# firmware: without exceptions or RTTI (docs/plans/elf_app_loader.md, Phase 4).
+#
+# These are mangled names, so they're tied to the toolchain the firmware and
+# apps are built with (GCC 14, the C++11 string ABI, 32-bit size_t: "j" is
+# unsigned int). A toolchain update can change them; check_app_elf.py catches
+# that when an app is built.
+
+# operator new and delete, tracked like malloc and free (esp_elf_alloc.h):
+# new(size_t), new[](size_t), delete(void *), delete(void *, size_t), and the
+# same for delete[]
+_Znwj = esp_elf_app_new
+_Znaj = esp_elf_app_new
+_ZdlPv = esp_elf_app_free
+_ZdlPvj = esp_elf_app_free
+_ZdaPv = esp_elf_app_free
+_ZdaPvj = esp_elf_app_free
+
+# Global destructors, run when the app is unloaded (esp_elf_destruct())
+__cxa_atexit = esp_elf_cxa_atexit
+
+# Atomics (std::atomic, C11 atomics). Apps are compiled without hardware
+# atomics, which don't work on PSRAM (elf_loader.cmake), so these are calls
+# to ESP-IDF's versions. Aligned 4-byte loads and stores need no call.
+__atomic_compare_exchange_1
+__atomic_compare_exchange_4
+__atomic_exchange_1
+__atomic_exchange_4
+__atomic_fetch_add_4
+__atomic_fetch_and_4
+__atomic_fetch_or_4
+__atomic_fetch_sub_4
+
+# Function-local statics: the firmware's thread-safe guards (ESP-IDF's
+# cxx_guards.cpp). The guard variables are in the app.
+__cxa_guard_acquire
+__cxa_guard_release
+__cxa_guard_abort
+
+# The parts of libstdc++ that aren't header templates, so apps can't compile
+# them in, and the prebuilt library can't be linked into an app (it isn't
+# position-independent, and it's built with exceptions). The firmware has them
+# already. Without exceptions, the __throw_* functions abort, as they do in the
+# firmware (ESP-IDF's cxx_exception_stubs.cpp).
+_ZSt17__throw_bad_allocv
+_ZSt19__throw_logic_errorPKc
+_ZSt20__throw_length_errorPKc
+_ZSt20__throw_out_of_rangePKc
+_ZSt24__throw_invalid_argumentPKc
+_ZSt24__throw_out_of_range_fmtPKcz
+_ZSt28__throw_bad_array_new_lengthv
+# Calling an empty std::function
+_ZSt25__throw_bad_function_callv
+# std::map and std::set
+_ZSt18_Rb_tree_decrementPSt18_Rb_tree_node_base
+_ZSt18_Rb_tree_incrementPSt18_Rb_tree_node_base
+_ZSt28_Rb_tree_rebalance_for_erasePSt18_Rb_tree_node_baseRS_
+_ZSt29_Rb_tree_insert_and_rebalancebPSt18_Rb_tree_node_baseS0_RS_
+# std::unordered_map and std::unordered_set
+_ZNKSt8__detail20_Prime_rehash_policy14_M_need_rehashEjjj
+# std::string (std::__cxx11::basic_string<char>::_M_replace_cold)
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE15_M_replace_coldEPcjPKcjj
+# What a pure virtual function's vtable slot points to (an abstract class's
+# constructor or destructor calling one); it aborts
+__cxa_pure_virtual

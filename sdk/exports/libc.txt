@@ -1,0 +1,61 @@
+# libc for ELF apps, beyond the table in src/esp_elf_symbol.c. Format: see
+# viper.txt.
+#
+# fopen and fclose (and opendir and closedir) go through
+# components/system/src/elf_files.cpp, which closes the files and directories
+# an app leaves open when it closes, as the loader frees the memory it doesn't.
+
+# stdio.h: reading files
+fopen = viper_elf_fopen
+fclose = viper_elf_fclose
+fread
+fgets
+fseek
+ftell
+
+# Writing files, for apps streaming into their data folder (viper_data_path()).
+# fwrite, fputs and fprintf are in the libc table already.
+fflush
+remove
+rename
+
+# sys/stat.h and dirent.h. opendir and closedir go through elf_files.cpp too,
+# so a directory left open is closed with the app.
+mkdir
+stat
+opendir = viper_elf_opendir
+readdir
+closedir = viper_elf_closedir
+
+# string.h: what the libc table lacks. GCC also turns code into some of these
+# on its own (a copy of a string literal into strcpy).
+memcmp
+memmove
+strcpy
+strncmp
+strncpy
+strstr
+
+# math.h: float math. Exporting one the firmware doesn't use yet adds its code
+# to the firmware (roundf). Compiler helpers such as __divsf3 come from
+# libgcc, which apps link (elf_loader.cmake).
+atan2f
+atanf
+cbrtf
+ceilf
+cosf
+exp2f
+expf
+fabsf
+floorf
+fmodf
+hypotf
+logf
+lrintf
+lround
+lroundf
+powf
+roundf
+sinf
+sqrtf
+tanf

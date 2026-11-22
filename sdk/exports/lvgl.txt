@@ -1,0 +1,325 @@
+# The firmware's LVGL, for ELF apps. Apps use the OS's LVGL instance (its
+# display, screens and globals), so they call it rather than linking their own.
+# Format: see viper.txt.
+#
+# The first set is the LVGL API the built-in apps, the stages and ui use, minus
+# what an app shouldn't touch: LVGL's allocator (apps use malloc, which is
+# tracked), the display and input devices (apps get input through loop()),
+# screen loading, lv_async_call (it calls back into the app later), and font and
+# image decoder internals. Exporting a function costs a table entry, and the
+# function's code if nothing in the firmware uses it yet. Add what apps need.
+#
+# Names with "= viper_elf_..." go through components/system/src/elf_lvgl.cpp,
+# which tracks what the app creates outside its container (objects, timers,
+# animations, event callbacks) so closing the app deletes it. Every widget's
+# _create() is tracked; add a VIPER_ELF_TRACKED_CREATE() there for a new one.
+
+lv_anim_delete
+lv_anim_init
+lv_anim_path_ease_in
+lv_anim_path_ease_in_out
+lv_anim_path_ease_out
+lv_anim_path_linear
+lv_anim_set_delay
+lv_anim_set_duration
+lv_anim_set_exec_cb
+lv_anim_set_path_cb
+lv_anim_set_repeat_count
+lv_anim_set_values
+lv_anim_set_var
+lv_anim_start = viper_elf_lv_anim_start
+
+lv_arc_create = viper_elf_lv_arc_create
+lv_arc_set_angles
+lv_arc_set_bg_angles
+lv_arc_set_mode
+lv_arc_set_range
+lv_arc_set_rotation
+lv_arc_set_value
+
+lv_area_get_height
+lv_area_get_width
+lv_area_increase
+
+lv_bar_create = viper_elf_lv_bar_create
+lv_bar_set_orientation
+lv_bar_set_range
+lv_bar_set_value
+
+lv_button_create = viper_elf_lv_button_create
+
+lv_canvas_create = viper_elf_lv_canvas_create
+lv_canvas_fill_bg
+lv_canvas_set_buffer
+lv_canvas_set_draw_buf
+lv_canvas_set_px
+
+lv_color_black
+lv_color_hex
+lv_color_make
+lv_color_to_u16
+lv_color_to_u32
+lv_color_white
+
+lv_display_get_horizontal_resolution
+lv_display_get_vertical_resolution
+
+lv_draw_buf_create
+lv_draw_buf_destroy
+lv_draw_buf_init
+
+lv_dropdown_create = viper_elf_lv_dropdown_create
+lv_dropdown_get_option_count
+lv_dropdown_get_selected
+lv_dropdown_open
+lv_dropdown_set_options
+lv_dropdown_set_selected
+
+lv_event_get_code
+lv_event_get_current_target
+lv_event_get_target
+lv_event_get_user_data
+lv_event_set_ext_draw_size
+
+# Rasterizing a glyph into an A8 buffer yourself (Flappy bakes its text this
+# way): get_glyph_dsc, get_glyph_bitmap, then glyph_release_draw_data
+lv_font_get_glyph_bitmap
+lv_font_get_glyph_dsc
+lv_font_get_glyph_width
+lv_font_get_line_height
+lv_font_glyph_release_draw_data
+lv_font_montserrat_14
+lv_font_montserrat_16
+lv_font_montserrat_24
+lv_font_unscii_16
+lv_font_unscii_8
+# The firmware's own 48 px Montserrat (components/ui/include/ui_fonts.hpp): Clock
+# and Battery use it, so it costs nothing more. Declare it with
+# LV_FONT_DECLARE(viper_font_montserrat_48).
+viper_font_montserrat_48
+# An app's own fonts (lv_font_conv's .c output; Mac Classic's mac_fonts.c)
+# point their lv_font_t at these, as LVGL's built-in fonts do
+lv_font_get_bitmap_fmt_txt
+lv_font_get_glyph_dsc_fmt_txt
+
+lv_gif_create = viper_elf_lv_gif_create
+lv_gif_is_loaded
+lv_gif_pause
+lv_gif_resume
+lv_gif_set_src
+
+lv_grad_init_stops
+lv_grad_linear_init
+
+# Decoding an image file to pixels without a widget (Flappy scales its PNGs
+# itself): open, read dsc.decoded (lvgl_private.h), close. Always close it.
+lv_image_decoder_close
+lv_image_decoder_open
+lv_image_cache_drop
+lv_image_create = viper_elf_lv_image_create
+lv_image_get_src
+lv_image_get_src_height
+lv_image_get_src_width
+lv_image_set_antialias
+lv_image_set_pivot
+lv_image_set_scale
+lv_image_set_scale_x
+lv_image_set_scale_y
+lv_image_set_src
+
+lv_indev_active
+lv_indev_get_point
+
+lv_label_class
+lv_label_create = viper_elf_lv_label_create
+lv_label_get_text
+lv_label_set_long_mode
+lv_label_set_recolor
+lv_label_set_text
+lv_label_set_text_fmt
+
+lv_line_create = viper_elf_lv_line_create
+lv_line_set_points
+
+lv_list_add_button
+lv_list_add_text
+lv_list_create = viper_elf_lv_list_create
+
+lv_obj_add_event_cb = viper_elf_lv_obj_add_event_cb
+lv_obj_add_flag
+lv_obj_add_state
+lv_obj_add_style
+lv_obj_align
+lv_obj_align_to
+lv_obj_center
+lv_obj_check_type
+lv_obj_clean
+lv_obj_create = viper_elf_lv_obj_create
+lv_obj_delete
+lv_obj_get_child
+lv_obj_get_child_count
+lv_obj_get_content_height
+lv_obj_get_content_width
+lv_obj_get_coords
+lv_obj_get_height
+lv_obj_get_parent
+lv_obj_get_style_prop
+lv_obj_get_user_data
+lv_obj_get_width
+lv_obj_get_x
+lv_obj_get_y
+lv_obj_has_flag
+lv_obj_has_state
+lv_obj_invalidate
+lv_obj_is_valid
+lv_obj_move_to_index
+lv_obj_refresh_ext_draw_size
+lv_obj_remove_event_cb
+lv_obj_remove_event_cb_with_user_data
+lv_obj_remove_flag
+lv_obj_remove_local_style_prop
+lv_obj_remove_style
+lv_obj_remove_style_all
+lv_obj_remove_state
+lv_obj_scroll_to
+lv_obj_scroll_to_view
+lv_obj_scroll_to_y
+lv_obj_set_align
+lv_obj_set_flag
+lv_obj_set_flex_align
+lv_obj_set_flex_flow
+lv_obj_set_flex_grow
+lv_obj_set_height
+lv_obj_set_layout
+lv_obj_set_pos
+lv_obj_set_scroll_dir
+lv_obj_set_scroll_snap_y
+lv_obj_set_scrollbar_mode
+lv_obj_set_size
+lv_obj_set_style_arc_color
+lv_obj_set_style_arc_opa
+lv_obj_set_style_arc_width
+lv_obj_set_style_bg_color
+lv_obj_set_style_bg_grad_color
+lv_obj_set_style_bg_grad_dir
+lv_obj_set_style_bg_image_src
+lv_obj_set_style_bg_image_tiled
+lv_obj_set_style_bg_opa
+lv_obj_set_style_blend_mode
+lv_obj_set_style_border_color
+lv_obj_set_style_border_opa
+lv_obj_set_style_border_side
+lv_obj_set_style_border_width
+lv_obj_set_style_clip_corner
+lv_obj_set_style_image_recolor
+lv_obj_set_style_image_recolor_opa
+lv_obj_set_style_line_color
+lv_obj_set_style_line_opa
+lv_obj_set_style_line_rounded
+lv_obj_set_style_line_width
+lv_obj_set_style_margin_bottom
+lv_obj_set_style_margin_top
+lv_obj_set_style_opa
+lv_obj_set_style_outline_color
+lv_obj_set_style_outline_pad
+lv_obj_set_style_outline_width
+lv_obj_set_style_pad_bottom
+lv_obj_set_style_pad_column
+lv_obj_set_style_pad_left
+lv_obj_set_style_pad_right
+lv_obj_set_style_pad_row
+lv_obj_set_style_pad_top
+lv_obj_set_style_radius
+lv_obj_set_style_shadow_color
+lv_obj_set_style_shadow_opa
+lv_obj_set_style_shadow_spread
+lv_obj_set_style_shadow_width
+lv_obj_set_style_text_align
+lv_obj_set_style_text_color
+lv_obj_set_style_text_font
+lv_obj_set_style_text_letter_space
+lv_obj_set_style_text_line_space
+lv_obj_set_style_text_opa
+lv_obj_set_style_transform_height
+lv_obj_set_style_transform_pivot_x
+lv_obj_set_style_transform_pivot_y
+lv_obj_set_style_transform_rotation
+lv_obj_set_style_transform_width
+lv_obj_set_style_translate_x
+lv_obj_set_style_translate_y
+lv_obj_set_user_data
+lv_obj_set_width
+lv_obj_set_x
+lv_obj_set_y
+lv_obj_update_layout
+
+lv_pct
+
+lv_rand
+
+lv_screen_active
+
+lv_slider_create = viper_elf_lv_slider_create
+lv_slider_get_value
+lv_slider_set_range
+lv_slider_set_value
+
+lv_style_init
+lv_style_reset
+lv_style_set_arc_color
+lv_style_set_arc_opa
+lv_style_set_arc_width
+lv_style_set_bg_color
+lv_style_set_bg_grad
+lv_style_set_bg_opa
+lv_style_set_border_color
+lv_style_set_border_opa
+lv_style_set_border_width
+lv_style_set_height
+lv_style_set_pad_bottom
+lv_style_set_pad_column
+lv_style_set_pad_left
+lv_style_set_pad_right
+lv_style_set_pad_row
+lv_style_set_pad_top
+lv_style_set_radius
+lv_style_set_text_align
+lv_style_set_text_color
+lv_style_set_text_font
+lv_style_set_text_opa
+lv_style_set_width
+
+lv_switch_create = viper_elf_lv_switch_create
+
+lv_table_create = viper_elf_lv_table_create
+lv_table_set_cell_value
+lv_table_set_cell_value_fmt
+
+lv_tabview_add_tab
+lv_tabview_create = viper_elf_lv_tabview_create
+lv_tabview_get_content
+lv_tabview_get_tab_bar
+lv_tabview_set_active
+
+lv_text_get_size
+lv_text_get_width
+
+lv_textarea_add_char
+lv_textarea_add_text
+lv_textarea_create = viper_elf_lv_textarea_create
+lv_textarea_get_text
+lv_textarea_set_cursor_pos
+lv_textarea_set_one_line
+lv_textarea_set_password_mode
+lv_textarea_set_placeholder_text
+lv_textarea_set_text
+
+lv_tick_get
+
+lv_timer_create = viper_elf_lv_timer_create
+lv_timer_delete = viper_elf_lv_timer_delete
+lv_timer_get_user_data
+lv_timer_pause
+lv_timer_reset
+lv_timer_resume
+lv_timer_set_period
