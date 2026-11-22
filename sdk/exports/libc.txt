@@ -18,23 +18,35 @@ ftell
 fflush
 remove
 rename
+# Formatting into a buffer, beside the table's snprintf (Doom's menus)
+sprintf
 
 # sys/stat.h and dirent.h. opendir and closedir go through elf_files.cpp too,
 # so a directory left open is closed with the app.
 mkdir
 stat
+# unistd.h: whether a file is there (Doom looks for its WADs and demos)
+access
 opendir = viper_elf_opendir
 readdir
 closedir = viper_elf_closedir
 
 # string.h: what the libc table lacks. GCC also turns code into some of these
 # on its own (a copy of a string literal into strcpy).
+memchr
 memcmp
 memmove
+strcasecmp
+strcat
 strcpy
+strncasecmp
 strncmp
 strncpy
 strstr
+strtok
+
+# stdlib.h: what the libc table lacks
+atoi
 
 # math.h: float math. Exporting one the firmware doesn't use yet adds its code
 # to the firmware (roundf). Compiler helpers such as __divsf3 come from

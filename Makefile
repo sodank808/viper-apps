@@ -22,7 +22,7 @@ INSTALL := sdk/tools/install_app.sh
 # the firmware's fatfs image; list them in SDCARD_APPS.
 FATFS_APPS_DIR ?= out/fatfs/apps
 SDCARD_APPS_DIR ?= out/sdcard/elf_apps
-SDCARD_APPS :=
+SDCARD_APPS := doom
 
 # Every folder with a CMakeLists.txt is an app project (sdk/ has none)
 APPS := $(patsubst %/CMakeLists.txt,%,$(wildcard */CMakeLists.txt))

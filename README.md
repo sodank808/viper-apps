@@ -34,6 +34,8 @@ An app returns a `viper_app_t` from `app_main()` (the `VIPER_APP()` macro): call
 
 The repo, the SDK and the tooling are MIT ([`LICENSE`](LICENSE); LVGL's headers are MIT too, [`sdk/lvgl/LICENCE.txt`](sdk/lvgl/LICENCE.txt)). An app that includes third-party code keeps that code's license in its own folder, and the table below lists it. Each app is a separate program the firmware loads at run time, so an app's license covers that app.
 
-No app here includes third-party code yet.
+| App | License | Third-party code |
+| --- | --- | --- |
+| [Doom](doom/) | GPL-2.0 | PrBoom, by way of [esp-cpp/prboom](https://github.com/esp-cpp/prboom) (`doom/main/prboom/COPYING`) |
 
 Game data (WADs, ROMs) is never committed here except where its license allows redistribution.
