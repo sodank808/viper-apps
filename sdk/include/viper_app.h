@@ -237,6 +237,16 @@ int viper_battery_level(void);
 bool viper_battery_charging(void);
 bool viper_memory(uint32_t heap, uint32_t *free_bytes, uint32_t *total_bytes);
 
+/* A big block of memory to borrow: the PSRAM the firmware keeps for its
+ * built-in emulators' ROMs, which nothing else uses while an ELF app is in
+ * front. On a device with 8 MB of PSRAM it's most of what's free (2 MB), so
+ * an app that needs more than the heap has left (a game engine's heap, say)
+ * asks for it. Returns the block, and its size in *size, or NULL and 0 when
+ * the firmware has none to lend. It holds whatever was in it before. The app
+ * has it until it closes: don't free it, and don't keep it past destroy().
+ * Calling it again returns the same block. */
+void *viper_memory_scratch(size_t *size);
+
 /* Sound: an audio tap, a callback the audio task calls for each block of
  * output, `frames` stereo frames of 16-bit samples (samples[2 * i] is left,
  * samples[2 * i + 1] right) at viper_audio_sample_rate(). The block arrives

@@ -1,0 +1,8 @@
+{
+    "name": "Doom",
+    "shortname": "Doom",
+    "type": "EMULATOR",
+    "url": "doom://",
+    "extensions": [".wad"],
+    "icon_path": "icon.png"
+}

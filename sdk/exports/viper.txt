@@ -45,6 +45,7 @@ viper_imu_gyro
 viper_battery_level
 viper_battery_charging
 viper_memory
+viper_memory_scratch
 
 # Sound
 viper_audio_tap_install

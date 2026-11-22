@@ -34,8 +34,10 @@ __cxa_guard_abort
 __cxa_guard_acquire
 __cxa_guard_release
 __cxa_pure_virtual
+access
 atan2f
 atanf
+atoi
 cbrtf
 ceilf
 closedir
@@ -325,6 +327,7 @@ lv_timer_pause
 lv_timer_reset
 lv_timer_resume
 lv_timer_set_period
+memchr
 memcmp
 memmove
 mkdir
@@ -337,12 +340,17 @@ roundf
 shared_mem_get_base
 shared_mem_get_size
 sinf
+sprintf
 sqrtf
 stat
+strcasecmp
+strcat
 strcpy
+strncasecmp
 strncmp
 strncpy
 strstr
+strtok
 tanf
 viper_app_arg
 viper_app_argc
@@ -388,6 +396,7 @@ viper_link_sync_receive
 viper_link_sync_send
 viper_log
 viper_memory
+viper_memory_scratch
 viper_prefs_available
 viper_prefs_get_blob
 viper_prefs_get_float
