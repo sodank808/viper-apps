@@ -1,0 +1,7 @@
+{
+    "name": "Wolfenstein 3D",
+    "shortname": "Wolf3D",
+    "type": "NATIVE",
+    "url": "elf://app.viper.wolf3d",
+    "icon_path": "icon.png"
+}
