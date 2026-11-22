@@ -1,0 +1,8 @@
+# Basic configuration for hello_world ELF app
+CONFIG_IDF_TARGET="esp32s3"
+
+# Minimal configuration for ELF apps
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+#CONFIG_APP_BUILD_TYPE_RAM=y
+CONFIG_ESP_SYSTEM_MEMPROT_FEATURE_LOCK=n
