@@ -31,6 +31,22 @@ opendir = viper_elf_opendir
 readdir
 closedir = viper_elf_closedir
 
+# pthread.h: what the libc table (pthread_create, _join, ...) lacks, for an
+# app with a thread of its own to hand work to and from (Wolfenstein 3D's
+# engine runs on one). Not tracked: an app destroys its mutexes and
+# condition variables before it closes, or they leak (ESP-IDF allocates one
+# for each on first use, statically initialized ones included).
+pthread_mutex_init
+pthread_mutex_destroy
+pthread_mutex_lock
+pthread_mutex_unlock
+pthread_cond_init
+pthread_cond_destroy
+pthread_cond_signal
+pthread_cond_broadcast
+pthread_cond_wait
+pthread_cond_timedwait
+
 # string.h: what the libc table lacks. GCC also turns code into some of these
 # on its own (a copy of a string literal into strcpy).
 memchr
