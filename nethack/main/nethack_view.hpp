@@ -3,25 +3,29 @@
 // Drawing the game: the map in one of three views, with what the engine is
 // waiting for drawn over it (a menu, a text window, a yes/no question, the
 // messages to read). The views draw the same model: the terminal view
-// (NetHack's characters in its colors), and NetHack's tiles at 16x16 and at
-// 8x8; each scrolls the map to keep the hero (or the cursor) in view. Plain gfx drawing into the
-// frame, so the host's tests can draw into a buffer of their own.
+// (NetHack's characters in its colors), NetHack's tiles at 16x16 and at 8x8
+// (each scrolling the map to keep the hero, or the cursor, in view), and the
+// first-person view, which shows the 16x16 tiles while a position is chosen. Plain gfx drawing into
+// the frame, so the host's tests can draw into a buffer of their own.
 
 #include <string>
 #include <vector>
 
 #include "gfx/surface.hpp"
 #include "nethack_game.hpp"
+#include "raycast/raycaster.hpp"
 
 namespace nethack {
 
 class TileSet;
+class FirstPerson;
 
 // How the map is drawn
 enum class MapView {
     Terminal,
-    Tiles,      // 16x16
-    SmallTiles, // 8x8, the whole height of the map
+    Tiles,       // 16x16
+    SmallTiles,  // 8x8, the whole height of the map
+    FirstPerson, // from the hero's eyes (nethack_first_person.hpp)
 };
 
 // The view's own state: what the player is pointing at in a menu or text
@@ -35,6 +39,10 @@ struct ViewState {
     std::string hints;       // the controls line while playing
     MapView map_view = MapView::Terminal;
     TileSet *tiles = nullptr; // for the tile views; the terminal's without
+    // The first-person view's: where the camera is, which way the hero faces
+    FirstPerson *first_person = nullptr;
+    raycast::Camera camera;
+    int facing = 0;
 };
 
 // Lines a menu or text window shows at once on an h-pixel-high screen

@@ -8,18 +8,22 @@
 // searching), B is Escape, X the inventory (choose an item for what to do with
 // it), Y the command list, L and R go up and down stairs, Start the game menu
 // (options, help, extended commands, save), and a short press of Select the
-// next view (terminal, tiles, small tiles). While a position is chosen
-// (travel, far look), the d-pad moves a cursor and A picks.
+// next view (terminal, tiles, small tiles, first person). While a position
+// is chosen (travel, far look), the d-pad moves a cursor and A picks. In the
+// first-person view the d-pad is the hero's: Up steps forward, Down back,
+// Left and Right turn, two at once step diagonally, and L and R step aside.
 
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "gfx/surface.hpp"
 #include "nethack_app.h"
 #include "nethack_engine.hpp"
+#include "nethack_first_person.hpp"
 #include "nethack_tiles.hpp"
 #include "nethack_view.hpp"
 #include "viper_app.h"
@@ -48,6 +52,10 @@ constexpr uint32_t kRepeatMs = 110;
 constexpr uint32_t kSelectTapMs = 500;
 // The view chosen last, in the app's preferences
 constexpr const char *kViewPref = "view";
+// The first-person view's steps and turns take this long
+constexpr uint32_t kTweenMs = 120;
+// NetHack's direction keys clockwise from north: N, NE, E, SE, S, SW, W, NW
+constexpr char kCompass[] = "kulnjbhy";
 
 // The hero: its save is found by this name
 constexpr const char *kHeroName = "Viper";
@@ -159,6 +167,16 @@ struct App {
     TileSet tiles;
     std::string app_dir;
     uint32_t select_down = 0; // when Select went down (0: it's up)
+
+    // The first-person view: which way the hero faces (0 north, 1 east, 2
+    // south, 3 west), and the camera's move from one place or facing to the
+    // next
+    FirstPerson first_person;
+    int facing = 1;
+    raycast::Camera cam_from, cam_to;
+    uint32_t tween_start = 0;
+    int last_hero_x = -1, last_hero_y = -1;
+    uint32_t now_ms = 0;
 };
 
 App *a = nullptr;
@@ -420,6 +438,99 @@ void input_position(const viper_input_t *now, const viper_input_t *previous) {
     }
 }
 
+// ---- the first-person view ----
+
+// How many eighths of a turn clockwise from straight ahead the d-pad's
+// direction key is (k ahead, u ahead-right, l right, ...)
+int offset_of(char key) {
+    for (int i = 0; i < 8; i++) {
+        if (kCompass[i] == key) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+// The direction key `offset` eighths of a turn clockwise from where the
+// hero faces
+char relative_key(int offset) { return kCompass[(2 * a->facing + offset) & 7]; }
+
+// Where the camera is now: between cam_from and cam_to, eased
+raycast::Camera current_camera() {
+    const uint32_t elapsed = a->now_ms - a->tween_start;
+    float t = elapsed >= kTweenMs ? 1.0f : static_cast<float>(elapsed) / kTweenMs;
+    t = t * t * (3.0f - 2.0f * t);
+    const raycast::Camera &f = a->cam_from, &to = a->cam_to;
+    return {f.x + (to.x - f.x) * t, f.y + (to.y - f.y) * t, f.angle + (to.angle - f.angle) * t};
+}
+
+bool camera_moving() { return a->now_ms - a->tween_start < kTweenMs; }
+
+// The angle for facing, the turn nearest `from`
+float angle_near(int facing, float from) {
+    constexpr float kTwoPi = 6.2831853f;
+    float angle = facing_angle(facing);
+    while (angle - from > kTwoPi / 2) {
+        angle -= kTwoPi;
+    }
+    while (from - angle > kTwoPi / 2) {
+        angle += kTwoPi;
+    }
+    return angle;
+}
+
+// Follows the hero: a step to the next cell is tweened, a jump (a
+// teleport, the stairs, a new game) isn't
+void update_camera(const Model &m) {
+    if (m.hero_x == a->last_hero_x && m.hero_y == a->last_hero_y) {
+        return;
+    }
+    const bool step = a->last_hero_x >= 0 && std::abs(m.hero_x - a->last_hero_x) <= 1 &&
+                      std::abs(m.hero_y - a->last_hero_y) <= 1;
+    const raycast::Camera here{m.hero_x + 0.5f, m.hero_y + 0.5f, 0.0f};
+    a->cam_from = step ? current_camera() : raycast::Camera{here.x, here.y, a->cam_to.angle};
+    if (!step) {
+        a->cam_from.angle = facing_angle(a->facing);
+    }
+    a->cam_to = {here.x, here.y, angle_near(a->facing, a->cam_from.angle)};
+    a->tween_start = step ? a->now_ms : a->now_ms - kTweenMs;
+    a->last_hero_x = m.hero_x;
+    a->last_hero_y = m.hero_y;
+    a->dirty = true;
+}
+
+// Turns the hero a quarter turn (1 right, -1 left): the view only, not a move
+void turn(int quarter) {
+    a->cam_from = current_camera();
+    a->facing = (a->facing + quarter + 4) % 4;
+    a->cam_to.angle = angle_near(a->facing, a->cam_from.angle);
+    a->tween_start = a->now_ms;
+    a->dirty = true;
+}
+
+// The d-pad and L/R in the first-person view, playing. True if they did
+// something.
+bool input_first_person(const viper_input_t *now, const viper_input_t *previous) {
+    if (char key = read_direction(now, previous, true)) {
+        const int offset = offset_of(key);
+        if (offset == 2 || offset == 6) {
+            turn(offset == 2 ? 1 : -1);
+        } else {
+            engine_answer_key(relative_key(offset));
+        }
+        return true;
+    }
+    if (pressed(now, previous, VIPER_BUTTON_L)) {
+        engine_answer_key(relative_key(6));
+        return true;
+    }
+    if (pressed(now, previous, VIPER_BUTTON_R)) {
+        engine_answer_key(relative_key(2));
+        return true;
+    }
+    return false;
+}
+
 void input_key(const viper_input_t *now, const viper_input_t *previous) {
     const Model &m = engine_model();
     if (a->list != List::None) {
@@ -430,7 +541,11 @@ void input_key(const viper_input_t *now, const viper_input_t *previous) {
         input_position(now, previous);
         return;
     }
-    if (char key = read_direction(now, previous, true)) {
+    if (a->map_view == MapView::FirstPerson) {
+        if (input_first_person(now, previous)) {
+            return;
+        }
+    } else if (char key = read_direction(now, previous, true)) {
         engine_answer_key(key);
         return;
     }
@@ -483,7 +598,9 @@ void input_yes_no(const viper_input_t *now, const viper_input_t *previous) {
         // A free key: a direction ("In what direction?"), or an object's
         // letter ("What do you want to eat? [fg or ?*]"), which A lists
         if (char key = read_direction(now, previous, false)) {
-            engine_answer_yn(key);
+            // In the first-person view, as the hero faces
+            engine_answer_yn(a->map_view == MapView::FirstPerson ? relative_key(offset_of(key))
+                                                                 : key);
         } else if (pressed(now, previous, VIPER_BUTTON_A)) {
             const bool direction = r.query.find("direction") != std::string::npos;
             engine_answer_yn(direction ? '.' : '?');
@@ -678,8 +795,14 @@ void draw_frame() {
         } else {
             a->view.hints = std::string("A:") + context_action(m).label + " X:items Y:cmds St:menu";
         }
+        if (a->map_view == MapView::FirstPerson && !m.getpos) {
+            a->view.hints = std::string("A:") + context_action(m).label + " <>:turn Y:cmds St:menu";
+        }
         a->view.map_view = a->map_view;
         a->view.tiles = &a->tiles;
+        a->view.first_person = &a->first_person;
+        a->view.camera = current_camera();
+        a->view.facing = a->facing;
         draw(s, m, a->view);
     }
     viper_frame_end(1);
@@ -706,6 +829,9 @@ void next_view() {
         set_view(MapView::SmallTiles);
         break;
     case MapView::SmallTiles:
+        set_view(MapView::FirstPerson);
+        break;
+    case MapView::FirstPerson:
         set_view(MapView::Terminal);
         break;
     }
@@ -731,7 +857,8 @@ void create(void *) {
     const std::string app_dir = viper_app_path() ? viper_app_path() : ".";
     a->app_dir = app_dir;
     int32_t view = 0;
-    if (viper_prefs_get_int(kViewPref, &view) && view > 0 && view <= 2) {
+    if (viper_prefs_get_int(kViewPref, &view) && view > 0 &&
+        view <= static_cast<int32_t>(MapView::FirstPerson)) {
         set_view(static_cast<MapView>(view));
     }
     const char *data = viper_data_path();
@@ -772,6 +899,7 @@ uint32_t loop(const viper_input_t *now, const viper_input_t *previous) {
         return 30;
     }
 
+    a->now_ms = now->now_ms;
     input_select(now, previous);
     bool waiting = engine_run(kFrameWaitMs);
     if (engine_finished()) {
@@ -792,7 +920,9 @@ uint32_t loop(const viper_input_t *now, const viper_input_t *previous) {
             a->request_id = m.request_id;
             begin_request(m);
         }
-        if (a->dirty || m.changes != a->drawn_changes) {
+        update_camera(m);
+        if (a->dirty || m.changes != a->drawn_changes ||
+            (a->map_view == MapView::FirstPerson && camera_moving())) {
             draw_frame();
             a->drawn_changes = m.changes;
             a->dirty = false;
@@ -824,6 +954,8 @@ nethack::AppStatus nethack::app_status() {
     s.commands_open = a->list == List::Commands;
     s.game_menu_open = a->list == List::Game;
     s.map_view = static_cast<int>(a->map_view);
+    s.facing = a->facing;
+    s.sprites = a->first_person.sprite_count();
     s.frames = a->frames;
     return s;
 }

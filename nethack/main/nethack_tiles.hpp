@@ -4,7 +4,9 @@
 // them come to 590 KB, more than the app should hold in memory beside the
 // game, so the file stays open and the tiles the map shows are read into a
 // cache as they're needed: a screen shows a few dozen at most. The small
-// (8x8) tiles are made from the 16x16 ones, each pixel the average of four.
+// (8x8) tiles are made from the 16x16 ones, each pixel the average of four,
+// and the first-person view's textures (column-major, as the raycaster reads
+// them) from them too.
 
 #include <cstdint>
 #include <cstdio>
@@ -12,6 +14,7 @@
 #include <vector>
 
 #include "gfx/color.hpp"
+#include "raycast/raycaster.hpp"
 
 namespace nethack {
 
@@ -37,6 +40,14 @@ class TileSet {
     // needs the room: draw it before asking for many more.
     const gfx::Pixel *tile(int t, bool small = false);
 
+    // Tile t as a 16x16 texture for the raycaster (column-major): opaque
+    // (the background black) for walls and floors, or a sprite (the
+    // background raycast::kClear); dimmed for what the hero remembers but
+    // doesn't see. nullptr if t is out of range or can't be read. Good until
+    // the cache needs the room, as tile() is.
+    enum class Look : uint8_t { Opaque, OpaqueDim, Sprite, SpriteDim };
+    const raycast::Texture *texture(int t, Look look);
+
   private:
     struct Cache {
         int pixels = 0; // per tile
@@ -53,6 +64,8 @@ class TileSet {
     long tiles_at_ = 0; // where the first tile starts in the file
     std::vector<gfx::Pixel> palette_;
     Cache big_, small_;
+    Cache textures_;                        // by t * 4 + look
+    std::vector<raycast::Texture> texture_; // by slot
 };
 
 } // namespace nethack
