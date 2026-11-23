@@ -24,8 +24,14 @@ CONFIG_ELF_LOADER_LIBC_SYMBOLS,
 CONFIG_ELF_LOADER_ESPIDF_SYMBOLS and CONFIG_ELF_LOADER_CUSTOMER_SYMBOLS are on,
 as they are in sdkconfig.base. Keep the rules in sync with the loader.
 
+It also reports the app's API level: the highest level, in exports.lock
+(beside exports/), of the firmware functions it calls; the loader's own libc
+and ESP-IDF functions are level 1. That's the oldest firmware API it runs on;
+install_app.sh writes it into the installed info.json as "min_api".
+
 Usage: check_app_elf.py [--src <elf_loader/src>] <app.elf>...
-       check_app_elf.py --builtin-list    (prints builtin.list for the SDK)
+       check_app_elf.py --api-level <app.elf>   (checks it, prints only its level)
+       check_app_elf.py --builtin-list          (prints builtin.list for the SDK)
 Exits 1 if any file has problems.
 """
 
@@ -133,6 +139,24 @@ def read_exports(src_dir):
     return exports
 
 
+def read_levels(src_dir):
+    """{name: API level} from exports.lock beside exports/ (empty if missing)."""
+    lock = src_dir.parent / "exports.lock"
+    levels = {}
+    if lock.exists():
+        for line in lock.read_text().splitlines():
+            fields = line.split()
+            if fields and not line.startswith("#"):
+                levels[fields[0]] = int(fields[1]) if len(fields) > 1 else 1
+    return levels
+
+
+def api_level(imports, levels):
+    """The API level an app calling `imports` needs: the highest of theirs,
+    1 for names with none (the loader's own, or none at all)."""
+    return max((levels.get(name, 1) for name in imports), default=1)
+
+
 def builtin_list(src_dir):
     """builtin.list's text: a header, then the names, sorted."""
     lines = ["# The libc and ESP-IDF names Viper's ELF loader exports itself, from its",
@@ -146,7 +170,9 @@ def c_string(data, offset):
     return data[offset:end].decode("utf-8", "replace")
 
 
-def check(path, exports):
+def check(path, exports, imports=None):
+    """Problems with the file (empty if none). Adds the names it imports from
+    the firmware to `imports` when given."""
     data = path.read_bytes()
     problems = []
 
@@ -243,14 +269,20 @@ def check(path, exports):
                 _, problem = pointer_section(pointer)
                 if problem:
                     problems.append(f"{where}: R_XTENSA_RELATIVE points to {problem}")
-            elif r_type == R_XTENSA_GLOB_DAT and sym_name and sym_name not in exports:
-                problems.append(f"{where}: {sym_name} isn't exported by the firmware")
+            elif r_type == R_XTENSA_GLOB_DAT and sym_name:
+                if imports is not None:
+                    imports.add(sym_name)
+                if sym_name not in exports:
+                    problems.append(f"{where}: {sym_name} isn't exported by the firmware")
             elif r_type == R_XTENSA_JMP_SLOT:
                 if st_value:
                     if loaded_section(st_value) is None:
                         problems.append(f"{where}: {sym_name} is at {describe(st_value)}")
-                elif sym_name not in exports:
-                    problems.append(f"{where}: {sym_name} isn't exported by the firmware")
+                else:
+                    if imports is not None:
+                        imports.add(sym_name)
+                    if sym_name not in exports:
+                        problems.append(f"{where}: {sym_name} isn't exported by the firmware")
 
     return problems
 
@@ -262,6 +294,8 @@ def main():
                         help="elf_loader/src directory to read the export tables from")
     parser.add_argument("--builtin-list", action="store_true",
                         help="print the loader's own exports in builtin.list's format and exit")
+    parser.add_argument("--api-level", action="store_true",
+                        help="print only the highest API level the files need")
     args = parser.parse_args()
     if args.builtin_list:
         sys.stdout.write(builtin_list(args.src))
@@ -270,16 +304,23 @@ def main():
         parser.error("no .app.elf files given")
 
     exports = read_exports(args.src)
+    levels = read_levels(args.src)
     failed = False
+    highest = 1
     for path in args.elf:
-        problems = check(path, exports)
+        imports = set()
+        problems = check(path, exports, imports)
+        level = api_level(imports, levels)
+        highest = max(highest, level)
         if problems:
             failed = True
             print(f"{path}: can't be loaded by Viper's ELF loader:", file=sys.stderr)
             for problem in problems:
                 print(f"  {problem}", file=sys.stderr)
-        else:
-            print(f"{path}: OK")
+        elif not args.api_level:
+            print(f"{path}: OK (API level {level})")
+    if args.api_level and not failed:
+        print(highest)
     return 1 if failed else 0
 
 

@@ -60,6 +60,15 @@ extern "C" {
  * (loop() got viper_gamepad_t) isn't run any more. */
 #define VIPER_APP_ABI_MIN_VERSION  2u
 
+/* The app API level: one more each time the firmware exports new functions.
+ * Apps built with this header can call the functions of every level up to it;
+ * firmware with a lower level refuses an app that calls one it doesn't have,
+ * naming it. components/elf_loader/exports.lock lists the level each function
+ * arrived in, check_app_elf.py reports the level an app needs, and its
+ * installed info.json says so as "min_api". viper_api_level() is the running
+ * firmware's. Written by check_exports_lock.py --update; don't edit. */
+#define VIPER_API_LEVEL 2
+
 typedef enum {
     VIPER_RENDER_LVGL = 0,        /* build an LVGL UI under the container */
     VIPER_RENDER_VIDEO_BLIT = 1,  /* draw to the framebuffer (viper_frame_begin()) */
@@ -236,6 +245,10 @@ void viper_app_keep_awake(int on);
 int viper_battery_level(void);
 bool viper_battery_charging(void);
 bool viper_memory(uint32_t heap, uint32_t *free_bytes, uint32_t *total_bytes);
+
+/* The firmware's VIPER_API_LEVEL. Itself new in API level 2, so an app that
+ * calls it needs that firmware or newer. */
+int viper_api_level(void);
 
 /* A big block of memory to borrow: the PSRAM the firmware keeps for its
  * built-in emulators' ROMs, which nothing else uses while an ELF app is in
