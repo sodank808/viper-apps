@@ -22,10 +22,15 @@ struct ViewState {
     std::vector<bool> marks; // Menu (PICK_ANY): the items marked, by item
     int choice = 0;          // YesNo: the lit choice
     std::string note;        // a line over the hints (a command list's title)
+    std::string hints;       // the controls line while playing
 };
 
 // Lines a menu or text window shows at once on an h-pixel-high screen
 int page_lines(int h);
+
+// A text window's lines as the view shows them, on a screen `width` pixels
+// wide: lines too long for it wrapped, keeping their indent
+std::vector<MenuItem> text_lines(const Window &w, int width);
 
 void draw(gfx::Surface &s, const Model &m, const ViewState &v);
 

@@ -462,6 +462,8 @@ viper_prefs_set_int 1
 viper_prefs_set_string 1
 viper_random 1
 viper_test 1
+viper_text_entry_open 4
+viper_text_entry_poll 4
 viper_time_local 1
 viper_time_us 1
 write 3

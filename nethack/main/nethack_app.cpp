@@ -3,9 +3,12 @@
 // gives the engine the turn, and when the engine waits for the player, reads
 // the buttons into an answer and draws the game (nethack_view.cpp).
 //
-// The buttons, playing: the d-pad moves (two at once, diagonally), A opens a
-// list of commands, B is Escape, X the inventory, Y searches, L and R go up
-// and down stairs, Start the extended commands (#pray, #loot, ...).
+// The buttons, playing: the d-pad moves (two at once, diagonally), A does
+// what's obvious where the hero is (stairs, picking up, opening a door; else
+// searching), B is Escape, X the inventory (choose an item for what to do with
+// it), Y the command list, L and R go up and down stairs, Start the game menu
+// (options, help, extended commands, save). While a position is chosen
+// (travel, far look), the d-pad moves a cursor and A picks.
 
 #include <sys/stat.h>
 
@@ -40,11 +43,13 @@ constexpr uint32_t kRepeatMs = 110;
 
 // The hero: its save is found by this name
 constexpr const char *kHeroName = "Viper";
+// The longest line typed on the keyboard (NetHack's own buffer is BUFSZ, 256)
+constexpr uint32_t kLineMax = 120;
 
 constexpr uint32_t kDirections =
     VIPER_BUTTON_UP | VIPER_BUTTON_DOWN | VIPER_BUTTON_LEFT | VIPER_BUTTON_RIGHT;
 
-// The command list (A): what each line sends
+// The command list (Y): what each line sends
 struct Command {
     const char *label;
     const char *keys;
@@ -84,6 +89,27 @@ constexpr Command kCommands[] = {
     {"Save and quit", "S"},
 };
 constexpr int kCommandCount = sizeof(kCommands) / sizeof(kCommands[0]);
+// The commands used last come first in the list, this many
+constexpr size_t kRecentCommands = 4;
+
+// The game menu (Start)
+constexpr Command kGameMenu[] = {
+    {"Extended command (#)", "#"}, {"Options", "O"},
+    {"Autopickup on/off", "@"},    {"Help", "?"},
+    {"Discoveries", "\\"},         {"Overview of the dungeon", "\x0f"},
+    {"Save and quit", "S"},
+};
+constexpr int kGameMenuCount = sizeof(kGameMenu) / sizeof(kGameMenu[0]);
+
+// NetHack's direction keys in its own order (xdir[]/ydir[]: west, northwest,
+// north, ...), as nh_port.h's doors bits are
+constexpr char kDirKeys[] = "hykulnjb";
+
+enum class List {
+    None,
+    Commands, // Y
+    Game,     // Start
+};
 
 enum class State {
     Running,
@@ -99,10 +125,11 @@ struct App {
     ViewState view;
     uint32_t frames = 0;
 
-    // The command list, open over the map
-    bool commands = false;
+    // The command list or game menu, open over the map
+    List list = List::None;
     int command_cursor = 0;
     int command_top = 0;
+    std::vector<int> recent; // kCommands used last, newest first
 
     // The d-pad: a direction pressed waits kDiagonalMs for a second one
     uint32_t dir_pressed = 0; // when the first went down (0: none waiting)
@@ -110,6 +137,9 @@ struct App {
     uint32_t dir_held_since = 0;
     uint32_t dir_repeat_at = 0;
     char dir_key = 0; // the key the d-pad sent last, while it's held
+
+    // The system keyboard, open for a line of text (Ask::Line)
+    bool typing = false;
 };
 
 App *a = nullptr;
@@ -192,7 +222,7 @@ bool pressed(const viper_input_t *now, const viper_input_t *previous, uint32_t b
 // A new request: the view starts over
 void begin_request(const Model &m) {
     a->view = ViewState{};
-    a->commands = false;
+    a->list = List::None;
     if (m.request.ask == Ask::Menu) {
         if (const Window *w = m.window(m.request.window)) {
             const auto &items = w->items;
@@ -232,37 +262,146 @@ void move_cursor(int &cursor, int &top, int count, int rows, int delta) {
     }
 }
 
+int screen_w() { return static_cast<int>(viper_display_width()); }
 int screen_h() { return static_cast<int>(viper_display_height()); }
 
 // ---- answering what the engine waits for ----
 
+// What A does where the hero is: its label in the hints, and its keys
+struct Action {
+    const char *label;
+    std::string keys;
+};
+
+Action context_action(const Model &m) {
+    if (m.here & NHV_HERE_DOWNSTAIRS)
+        return {"down", ">"};
+    if (m.here & NHV_HERE_UPSTAIRS)
+        return {"up", "<"};
+    if (m.here & NHV_HERE_OBJECTS)
+        return {"pick up", ","};
+    if (m.doors) {
+        // One door: open it; several: NetHack asks which way
+        const bool one = (m.doors & (m.doors - 1)) == 0;
+        std::string keys = "o";
+        for (int i = 0; one && i < 8; i++) {
+            if (m.doors & (1u << i)) {
+                keys += kDirKeys[i];
+            }
+        }
+        return {"open", keys};
+    }
+    if (m.here & NHV_HERE_FOUNTAIN)
+        return {"drink", "q"};
+    if (m.here & NHV_HERE_THRONE)
+        return {"sit", "#sit\n"};
+    if (m.here & NHV_HERE_ALTAR)
+        return {"look", ":"};
+    return {"search", "s"};
+}
+
+// Sends keys: the first answers the engine, the rest are queued for it
+void send_keys(const std::string &keys) {
+    if (keys.empty()) {
+        return;
+    }
+    engine_queue_keys(keys.substr(1));
+    engine_answer_key(static_cast<unsigned char>(keys[0]));
+}
+
+// The command list's order: the commands used last, then the rest
+std::vector<int> command_order() {
+    std::vector<int> order = a->recent;
+    for (int i = 0; i < kCommandCount; i++) {
+        if (std::find(order.begin(), order.end(), i) == order.end()) {
+            order.push_back(i);
+        }
+    }
+    return order;
+}
+
+int list_count() { return a->list == List::Game ? kGameMenuCount : kCommandCount; }
+
+void open_list(List list) {
+    a->list = list;
+    a->command_cursor = 0;
+    a->command_top = 0;
+    a->dirty = true;
+}
+
+void input_list(const viper_input_t *now, const viper_input_t *previous) {
+    const int count = list_count();
+    const int rows = page_lines(screen_h()) - 1;
+    int delta = 0;
+    if (pressed(now, previous, VIPER_BUTTON_UP))
+        delta = -1;
+    if (pressed(now, previous, VIPER_BUTTON_DOWN))
+        delta = 1;
+    if (pressed(now, previous, VIPER_BUTTON_L) || pressed(now, previous, VIPER_BUTTON_LEFT))
+        delta = -rows;
+    if (pressed(now, previous, VIPER_BUTTON_R) || pressed(now, previous, VIPER_BUTTON_RIGHT))
+        delta = rows;
+    if (delta) {
+        move_cursor(a->command_cursor, a->command_top, count, rows, delta);
+        a->dirty = true;
+    }
+    if (pressed(now, previous, VIPER_BUTTON_B)) {
+        a->list = List::None;
+        a->dirty = true;
+        return;
+    }
+    if (!pressed(now, previous, VIPER_BUTTON_A)) {
+        return;
+    }
+    const List list = a->list;
+    a->list = List::None;
+    a->dirty = true;
+    if (list == List::Game) {
+        send_keys(kGameMenu[a->command_cursor].keys);
+        return;
+    }
+    const int command = command_order()[a->command_cursor];
+    auto &recent = a->recent;
+    recent.erase(std::remove(recent.begin(), recent.end(), command), recent.end());
+    recent.insert(recent.begin(), command);
+    if (recent.size() > kRecentCommands) {
+        recent.resize(kRecentCommands);
+    }
+    send_keys(kCommands[command].keys);
+}
+
+// Choosing a position (getpos): the d-pad moves the cursor, A picks, X and Y
+// jump to the next monster and object, L and R to stairs
+void input_position(const viper_input_t *now, const viper_input_t *previous) {
+    if (char key = read_direction(now, previous, true)) {
+        engine_answer_key(key);
+        return;
+    }
+    struct Map {
+        uint32_t button;
+        int key;
+    };
+    static const Map kKeys[] = {
+        {VIPER_BUTTON_A, '.'},     {VIPER_BUTTON_B, kEsc}, {VIPER_BUTTON_X, 'm'},
+        {VIPER_BUTTON_Y, 'o'},     {VIPER_BUTTON_L, '<'},  {VIPER_BUTTON_R, '>'},
+        {VIPER_BUTTON_START, '@'},
+    };
+    for (const Map &k : kKeys) {
+        if (pressed(now, previous, k.button)) {
+            engine_answer_key(k.key);
+            return;
+        }
+    }
+}
+
 void input_key(const viper_input_t *now, const viper_input_t *previous) {
     const Model &m = engine_model();
-    (void)m;
-    if (a->commands) {
-        const int rows = page_lines(screen_h()) - 1;
-        int delta = 0;
-        if (pressed(now, previous, VIPER_BUTTON_UP))
-            delta = -1;
-        if (pressed(now, previous, VIPER_BUTTON_DOWN))
-            delta = 1;
-        if (pressed(now, previous, VIPER_BUTTON_L))
-            delta = -rows;
-        if (pressed(now, previous, VIPER_BUTTON_R))
-            delta = rows;
-        if (delta) {
-            move_cursor(a->command_cursor, a->command_top, kCommandCount, rows, delta);
-            a->dirty = true;
-        }
-        if (pressed(now, previous, VIPER_BUTTON_B)) {
-            a->commands = false;
-            a->dirty = true;
-        } else if (pressed(now, previous, VIPER_BUTTON_A)) {
-            a->commands = false;
-            const std::string keys = kCommands[a->command_cursor].keys;
-            engine_queue_keys(keys.substr(1));
-            engine_answer_key(static_cast<unsigned char>(keys[0]));
-        }
+    if (a->list != List::None) {
+        input_list(now, previous);
+        return;
+    }
+    if (m.getpos) {
+        input_position(now, previous);
         return;
     }
     if (char key = read_direction(now, previous, true)) {
@@ -274,8 +413,10 @@ void input_key(const viper_input_t *now, const viper_input_t *previous) {
         int key;
     };
     static const Map kKeys[] = {
-        {VIPER_BUTTON_B, kEsc}, {VIPER_BUTTON_X, 'i'}, {VIPER_BUTTON_Y, 's'},
-        {VIPER_BUTTON_L, '<'},  {VIPER_BUTTON_R, '>'}, {VIPER_BUTTON_START, '#'},
+        {VIPER_BUTTON_B, kEsc},
+        {VIPER_BUTTON_X, 'i'},
+        {VIPER_BUTTON_L, '<'},
+        {VIPER_BUTTON_R, '>'},
     };
     for (const Map &k : kKeys) {
         if (pressed(now, previous, k.button)) {
@@ -284,8 +425,11 @@ void input_key(const viper_input_t *now, const viper_input_t *previous) {
         }
     }
     if (pressed(now, previous, VIPER_BUTTON_A)) {
-        a->commands = true;
-        a->dirty = true;
+        send_keys(context_action(m).keys);
+    } else if (pressed(now, previous, VIPER_BUTTON_Y)) {
+        open_list(List::Commands);
+    } else if (pressed(now, previous, VIPER_BUTTON_START)) {
+        open_list(List::Game);
     }
 }
 
@@ -293,7 +437,20 @@ void input_yes_no(const viper_input_t *now, const viper_input_t *previous) {
     const Request &r = engine_model().request;
     const std::string choices = r.choices.substr(0, r.choices.find(kEsc));
     if (pressed(now, previous, VIPER_BUTTON_B)) {
-        engine_answer_yn(kEsc);
+        // Escape where the question takes it; otherwise q or n, as NetHack's
+        // tty does (an answer outside the choices is an error, "Program in
+        // disorder")
+        char key = kEsc;
+        if (!choices.empty() && r.choices.find(kEsc) == std::string::npos) {
+            if (choices.find('q') != std::string::npos) {
+                key = 'q';
+            } else if (choices.find('n') != std::string::npos) {
+                key = 'n';
+            } else if (r.def) {
+                key = r.def;
+            }
+        }
+        engine_answer_yn(key);
         return;
     }
     if (choices.empty()) {
@@ -380,7 +537,7 @@ void input_menu(const viper_input_t *now, const viper_input_t *previous) {
 void input_text(const viper_input_t *now, const viper_input_t *previous) {
     const Model &m = engine_model();
     const Window *w = m.window(m.request.window);
-    const int count = w ? static_cast<int>(w->items.size()) : 0;
+    const int count = w ? static_cast<int>(text_lines(*w, screen_w()).size()) : 0;
     const int rows = page_lines(screen_h());
     int top = a->view.top;
     if (pressed(now, previous, VIPER_BUTTON_UP))
@@ -400,6 +557,34 @@ void input_text(const viper_input_t *now, const viper_input_t *previous) {
     }
     if (pressed(now, previous, VIPER_BUTTON_A) || pressed(now, previous, VIPER_BUTTON_B)) {
         engine_answer_continue();
+    }
+}
+
+// A line of text, on the system keyboard: opened when the engine asks, and
+// read back once it closes. While it's open the OS has the buttons and the
+// screen.
+void input_line(const Model &m) {
+    if (!a->typing) {
+        viper_text_entry_t entry{};
+        entry.size = sizeof(entry);
+        entry.title = m.request.query.c_str();
+        entry.text = "";
+        entry.max_length = kLineMax;
+        if (!viper_text_entry_open(&entry)) {
+            engine_answer_line(std::string(1, kEsc));
+            return;
+        }
+        a->typing = true;
+        return;
+    }
+    char text[kLineMax + 1];
+    const int state = viper_text_entry_poll(text, sizeof(text));
+    if (state == VIPER_TEXT_ENTRY_DONE || state == VIPER_TEXT_ENTRY_CANCELLED ||
+        state == VIPER_TEXT_ENTRY_NONE) {
+        a->typing = false;
+        a->dirty = true;
+        engine_answer_line(state == VIPER_TEXT_ENTRY_DONE ? std::string(text)
+                                                          : std::string(1, kEsc));
     }
 }
 
@@ -430,6 +615,8 @@ bool answer(const viper_input_t *now, const viper_input_t *previous) {
         }
         break;
     case Ask::Line:
+        input_line(m);
+        break;
     case Ask::None:
         break;
     }
@@ -445,15 +632,27 @@ void draw_frame() {
                    static_cast<int>(viper_display_height()));
     if (a->state == State::Message) {
         draw_message(s, a->message);
-    } else if (a->commands) {
+    } else if (a->list != List::None) {
         std::vector<std::string> labels;
-        for (const Command &c : kCommands) {
-            labels.emplace_back(c.label);
+        if (a->list == List::Game) {
+            for (const Command &c : kGameMenu) {
+                labels.emplace_back(c.label);
+            }
+        } else {
+            for (int i : command_order()) {
+                labels.emplace_back(kCommands[i].label);
+            }
         }
-        draw_list(s, "Which command?", labels, a->command_cursor, a->command_top,
-                  "A: do it  B: back  L/R: page");
+        draw_list(s, a->list == List::Game ? "NetHack" : "Which command?", labels,
+                  a->command_cursor, a->command_top, "A: do it  B: back  L/R: page");
     } else {
-        draw(s, engine_model(), a->view);
+        const Model &m = engine_model();
+        if (m.getpos) {
+            a->view.hints = "A:pick B:cancel X:monster Y:object";
+        } else {
+            a->view.hints = std::string("A:") + context_action(m).label + " X:items Y:cmds St:menu";
+        }
+        draw(s, m, a->view);
     }
     viper_frame_end(1);
     a->frames++;
@@ -548,7 +747,8 @@ nethack::AppStatus nethack::app_status() {
     }
     s.open = true;
     s.message = a->state == State::Message ? a->message : std::string();
-    s.commands_open = a->commands;
+    s.commands_open = a->list == List::Commands;
+    s.game_menu_open = a->list == List::Game;
     s.frames = a->frames;
     return s;
 }

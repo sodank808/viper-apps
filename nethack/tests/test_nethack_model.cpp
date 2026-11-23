@@ -1,9 +1,10 @@
 // The game model NetHack's window port fills in (main/nethack_game.hpp):
-// plain C++, tested without NetHack.
+// plain C++, tested without NetHack; and how the view lays out its text.
 
 #include <catch2/catch_test_macros.hpp>
 
 #include "nethack_game.hpp"
+#include "nethack_view.hpp"
 
 using nethack::choices_in_query;
 
@@ -45,4 +46,26 @@ TEST_CASE("NetHack's game model keeps the map, messages and windows", "[nethack]
     CHECK(m.window(a) == nullptr);
     CHECK(m.window(b) != nullptr);
     CHECK(m.create_window(NHV_WIN_MENU) == 1);
+}
+
+TEST_CASE("NetHack's text windows wrap long lines, keeping their indent", "[nethack]") {
+    nethack::Window w;
+    auto add = [&w](const std::string &text) {
+        nethack::MenuItem item;
+        item.text = text;
+        w.items.push_back(item);
+    };
+    add("Short line");
+    add("");
+    add("  This line is far too long to fit on a screen forty characters across");
+    // 320 pixels: 40 cells, 39 of them for text
+    const auto lines = nethack::text_lines(w, 320);
+    REQUIRE(lines.size() == 4);
+    CHECK(lines[0].text == "Short line");
+    CHECK(lines[1].text.empty());
+    CHECK(lines[2].text == "  This line is far too long to fit on a");
+    CHECK(lines[3].text == "  screen forty characters across");
+    for (const auto &line : lines) {
+        CHECK(line.text.size() <= 39);
+    }
 }

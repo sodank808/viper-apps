@@ -78,6 +78,31 @@ std::vector<std::string> wrap(const std::string &t, int cols) {
     return lines;
 }
 
+} // namespace
+
+std::vector<MenuItem> text_lines(const Window &w, int width) {
+    const int cols = std::max(width / kCell - 1, 8);
+    std::vector<MenuItem> out;
+    for (const MenuItem &item : w.items) {
+        if (static_cast<int>(item.text.size()) <= cols) {
+            out.push_back(item);
+            continue;
+        }
+        // Wrapped lines keep the line's indent
+        const size_t first = item.text.find_first_not_of(' ');
+        const int indent = std::min(static_cast<int>(first), cols / 2);
+        const std::string pad(static_cast<size_t>(indent), ' ');
+        for (const std::string &part : wrap(item.text.substr(first), cols - indent)) {
+            MenuItem line = item;
+            line.text = pad + part;
+            out.push_back(std::move(line));
+        }
+    }
+    return out;
+}
+
+namespace {
+
 struct Layout {
     int cols;      // characters across
     int msg_y;     // the message lines
@@ -101,9 +126,11 @@ Layout layout(const gfx::Surface &s) {
 }
 
 int scroll_x(const Model &m, int map_cols) {
-    // Columns 1..79; the hero kept in the middle third where it can be
+    // Columns 1..79; the hero (or the cursor, choosing a position) kept in
+    // the middle where it can be
     const int first = 1, last = kCols - map_cols;
-    return std::clamp(m.hero_x - map_cols / 2, first, std::max(first, last));
+    const int x = m.getpos ? m.cursor_x : m.hero_x;
+    return std::clamp(x - map_cols / 2, first, std::max(first, last));
 }
 
 void draw_map(gfx::Surface &s, const Model &m, const Layout &l) {
@@ -133,6 +160,14 @@ void draw_map(gfx::Surface &s, const Model &m, const Layout &l) {
         s.frame({left + (m.hero_x - x0) * kCell - 1, l.map_y + m.hero_y * kCell - 1, kCell + 2,
                  kCell + 2},
                 gfx::rgb(80, 80, 40));
+    }
+    // Choosing a position: the cursor
+    if (m.getpos && m.cursor_x >= x0 && m.cursor_x < x0 + l.map_cols && m.cursor_y >= 0 &&
+        m.cursor_y < kRows) {
+        const gfx::Rect r{left + (m.cursor_x - x0) * kCell - 2, l.map_y + m.cursor_y * kCell - 2,
+                          kCell + 4, kCell + 4};
+        s.frame(r, kAccent);
+        s.frame({r.x + 1, r.y + 1, r.w - 2, r.h - 2}, kBright);
     }
 }
 
@@ -199,7 +234,9 @@ void draw_window(gfx::Surface &s, const Model &m, const ViewState &v, const Layo
         y += kPitch + 2;
     }
     const int rows = page_lines(s.h) - (w.prompt.empty() ? 0 : 1);
-    const auto &items = w.items;
+    // A text window's long lines are wrapped; a menu's are cut
+    const std::vector<MenuItem> wrapped = menu ? std::vector<MenuItem>{} : text_lines(w, s.w);
+    const auto &items = menu ? w.items : wrapped;
     const int count = static_cast<int>(items.size());
     for (int i = v.top; i < std::min(count, v.top + rows); i++) {
         const MenuItem &item = items[i];
@@ -327,7 +364,7 @@ void draw(gfx::Surface &s, const Model &m, const ViewState &v) {
         draw_more(s, m, l);
         break;
     default:
-        draw_hints(s, l, v.note.empty() ? "A:commands X:items Y:search L/R:<>" : v.note);
+        draw_hints(s, l, !v.note.empty() ? v.note : !v.hints.empty() ? v.hints : "");
         break;
     }
 }
