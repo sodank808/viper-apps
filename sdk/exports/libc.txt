@@ -87,3 +87,54 @@ roundf
 sinf
 sqrtf
 tanf
+
+# For NetHack (apps_public/nethack) and the Lua it bundles. Double-precision
+# math (Lua's numbers are doubles)
+acos
+asin
+atan2
+ceil
+cos
+exp
+floor
+fmod
+frexp
+log
+log10
+pow
+sin
+sqrt
+tan
+# stdio.h: reading NetHack's data files and Lua's, and buffering its
+# writes to a level or save file it opened with open() (fdopen)
+clearerr
+fdopen
+feof
+ferror
+fgetc
+getc
+rewind
+fscanf
+sscanf
+# stdlib.h, string.h, ctype.h
+atol
+getenv
+qsort
+strcoll
+strpbrk
+strspn
+tolower
+# time.h: the game's clock, the calendar (full moon, Friday the 13th)
+clock
+difftime
+gmtime
+localtime
+mktime
+time
+# fcntl.h and unistd.h: NetHack reads and writes its levels and saves by
+# file descriptor (close is in the libc table already)
+lseek
+open
+read
+unlink
+write

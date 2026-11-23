@@ -67,7 +67,7 @@ extern "C" {
  * arrived in, check_app_elf.py reports the level an app needs, and its
  * installed info.json says so as "min_api". viper_api_level() is the running
  * firmware's. Written by check_exports_lock.py --update; don't edit. */
-#define VIPER_API_LEVEL 2
+#define VIPER_API_LEVEL 4
 
 typedef enum {
     VIPER_RENDER_LVGL = 0,        /* build an LVGL UI under the container */
@@ -370,6 +370,38 @@ void viper_frame_end(int flush_all);
  * Returns false, and changes nothing, in an LVGL app or for a size of 0 or
  * larger than the screen. */
 bool viper_frame_set_indexed(uint32_t width, uint32_t height, const uint16_t *palette);
+
+/* The system keyboard, for a line of text: a name, a save's title, a wish.
+ * New in API level 4.
+ *
+ * viper_text_entry_open() opens it over the app and returns at once; the app
+ * keeps getting loop() calls and polls viper_text_entry_poll() in them. While
+ * it's open the buttons go to the keyboard (the app sees none down, and those
+ * held when it closes stay hidden until they're let go), and a VIDEO_BLIT
+ * app's frames aren't shown: viper_frame_begin() returns NULL, and the
+ * keyboard sits over a still of the app's last frame. Closing the app closes
+ * the keyboard. */
+typedef struct {
+    uint32_t size;       /* sizeof(viper_text_entry_t) */
+    const char *title;   /* what's asked, or NULL */
+    const char *text;    /* the text it starts with, or NULL */
+    uint32_t max_length; /* in characters; 0 for no limit */
+} viper_text_entry_t;
+
+#define VIPER_TEXT_ENTRY_NONE 0      /* none is open, or its answer has been read */
+#define VIPER_TEXT_ENTRY_OPEN 1      /* still open */
+#define VIPER_TEXT_ENTRY_DONE 2      /* the player entered text: it's in buf */
+#define VIPER_TEXT_ENTRY_CANCELLED 3 /* the player backed out */
+
+/* Opens the keyboard. Returns false, and opens nothing, if one is open
+ * already, outside create()..destroy(), or for a bad config. */
+bool viper_text_entry_open(const viper_text_entry_t *config);
+
+/* How the keyboard viper_text_entry_open() opened is going. When it closes,
+ * it returns VIPER_TEXT_ENTRY_DONE (with the text, UTF-8, copied to buf: cut
+ * to fit `size` bytes, always NUL-terminated) or VIPER_TEXT_ENTRY_CANCELLED,
+ * once; after that, VIPER_TEXT_ENTRY_NONE. */
+int viper_text_entry_poll(char *buf, size_t size);
 
 /* A pixel from 8-bit red, green and blue */
 #define VIPER_RGB565(r, g, b) \
