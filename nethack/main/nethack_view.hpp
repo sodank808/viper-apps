@@ -1,10 +1,11 @@
 #pragma once
 
-// Drawing the game: the terminal view (NetHack's characters in its colors,
-// the map scrolled to keep the hero in view), with what the engine is
+// Drawing the game: the map in one of three views, with what the engine is
 // waiting for drawn over it (a menu, a text window, a yes/no question, the
-// messages to read). Plain gfx drawing into the frame, so the host's tests
-// can draw into a buffer of their own.
+// messages to read). The views draw the same model: the terminal view
+// (NetHack's characters in its colors), and NetHack's tiles at 16x16 and at
+// 8x8; each scrolls the map to keep the hero (or the cursor) in view. Plain gfx drawing into the
+// frame, so the host's tests can draw into a buffer of their own.
 
 #include <string>
 #include <vector>
@@ -13,6 +14,15 @@
 #include "nethack_game.hpp"
 
 namespace nethack {
+
+class TileSet;
+
+// How the map is drawn
+enum class MapView {
+    Terminal,
+    Tiles,      // 16x16
+    SmallTiles, // 8x8, the whole height of the map
+};
 
 // The view's own state: what the player is pointing at in a menu or text
 // window, which yes/no choice is lit. Kept by the app, reset for each request.
@@ -23,6 +33,8 @@ struct ViewState {
     int choice = 0;          // YesNo: the lit choice
     std::string note;        // a line over the hints (a command list's title)
     std::string hints;       // the controls line while playing
+    MapView map_view = MapView::Terminal;
+    TileSet *tiles = nullptr; // for the tile views; the terminal's without
 };
 
 // Lines a menu or text window shows at once on an h-pixel-high screen

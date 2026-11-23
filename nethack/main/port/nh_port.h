@@ -53,8 +53,9 @@ void nhv_nethack_main(const char *app_dir, const char *data_dir, const char *nam
 
 /* ---- the map ---- */
 void nhv_map_clear(void);
-/* ch: the character NetHack would show; color 0..15 (NetHack's CLR_*) */
-void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags);
+/* ch: the character NetHack would show; color 0..15 (NetHack's CLR_*);
+ * tile: its tile (tiles.bin, numbered as src/tile.c), -1 for none */
+void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, int tile);
 /* Where the hero is (NetHack's cliparound) */
 void nhv_map_hero(int x, int y);
 
@@ -122,6 +123,9 @@ __attribute__((noreturn))
 #endif
 void nhv_exit(int status);
 void nhv_log(const char *text);
+/* The seed a game starts from, 0 for one of the platform's (the time); the
+ * tests set one (engine_set_seed()) so games repeat */
+unsigned long nhv_random_seed(void);
 
 #ifdef __cplusplus
 }

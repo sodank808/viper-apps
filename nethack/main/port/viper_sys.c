@@ -172,7 +172,9 @@ char *get_login_name(void) {
 }
 
 unsigned long sys_random_seed(void) {
-    return (unsigned long)time((time_t *)0) ^ (unsigned long)svh.hackpid;
+    unsigned long seed = nhv_random_seed(); /* the tests' own, if they set one */
+
+    return seed ? seed : (unsigned long)time((time_t *)0) ^ (unsigned long)svh.hackpid;
 }
 
 void get_nhuuid(void) {}

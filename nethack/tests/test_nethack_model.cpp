@@ -3,7 +3,13 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+#include <vector>
+
 #include "nethack_game.hpp"
+#include "nethack_tiles.hpp"
 #include "nethack_view.hpp"
 
 using nethack::choices_in_query;
@@ -68,4 +74,48 @@ TEST_CASE("NetHack's text windows wrap long lines, keeping their indent", "[neth
     for (const auto &line : lines) {
         CHECK(line.text.size() <= 39);
     }
+}
+
+TEST_CASE("NetHack's tiles are read from tiles.bin as they're needed", "[nethack]") {
+    nethack::TileSet tiles;
+    CHECK_FALSE(tiles.open("/nonexistent/tiles.bin"));
+    CHECK(tiles.tile(0) == nullptr);
+    REQUIRE(tiles.open(std::string(VIPER_SIM_NETHACK_DATA) + "/tiles.bin"));
+    // As many as src/tile.c numbers (total_tiles_used)
+    CHECK(tiles.count() == 2303);
+    CHECK(tiles.tile(-1) == nullptr);
+    CHECK(tiles.tile(tiles.count()) == nullptr);
+
+    // A giant ant (tile 0): its corners are the background, drawn black,
+    // and it isn't all background
+    const gfx::Pixel *ant = tiles.tile(0);
+    REQUIRE(ant);
+    CHECK(ant[0] == 0);
+    int drawn = 0;
+    for (int i = 0; i < 16 * 16; i++) {
+        drawn += ant[i] != 0;
+    }
+    CHECK(drawn > 20);
+    // Its statue (the first generated tile) is the same shape in grays
+    const std::vector<gfx::Pixel> ant_copy(ant, ant + 16 * 16);
+    const gfx::Pixel *statue = tiles.tile(1515);
+    REQUIRE(statue);
+    for (int i = 0; i < 16 * 16; i++) {
+        CHECK((statue[i] == 0) == (ant_copy[i] == 0));
+        const gfx::Rgb p = gfx::unpack(statue[i]);
+        CHECK(std::abs(p.r - p.g) < 24);
+        CHECK(std::abs(p.g - p.b) < 24);
+    }
+    // The small one: each pixel the average of four
+    const gfx::Pixel *small = tiles.tile(0, true);
+    REQUIRE(small);
+    CHECK(small[0] == 0);
+
+    // More tiles than the cache holds, and back: still right
+    for (int t = 0; t < 600; t++) {
+        REQUIRE(tiles.tile(t));
+    }
+    const gfx::Pixel *again = tiles.tile(0);
+    REQUIRE(again);
+    CHECK(std::equal(ant_copy.begin(), ant_copy.end(), again));
 }

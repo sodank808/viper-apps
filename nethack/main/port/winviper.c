@@ -304,6 +304,7 @@ static void viper_cliparound(int x, int y) { nhv_map_hero(x, y); }
 static void viper_print_glyph(winid w UNUSED, coordxy x, coordxy y, const glyph_info *glyphinfo,
                               const glyph_info *bkglyphinfo UNUSED) {
     unsigned gf = glyphinfo->gm.glyphflags, flags = 0;
+    int tile;
 
     if (gf & MG_PET)
         flags |= NHV_CELL_PET;
@@ -317,7 +318,13 @@ static void viper_print_glyph(winid w UNUSED, coordxy x, coordxy y, const glyph_
         flags |= NHV_CELL_INVERSE;
     if (!cansee(x, y))
         flags |= NHV_CELL_REMEMBERED;
-    nhv_map_glyph(x, y, glyphinfo->glyph, glyphinfo->ttychar, glyphinfo->gm.sym.color, flags);
+    /* Solid rock and what's never been seen are dark in the tile views, as
+       they're blank in the terminal one */
+    tile = glyphinfo->gm.tileidx;
+    if (glyph_is_unexplored(glyphinfo->glyph) ||
+        (glyph_is_cmap(glyphinfo->glyph) && glyph_to_cmap(glyphinfo->glyph) == S_stone))
+        tile = -1;
+    nhv_map_glyph(x, y, glyphinfo->glyph, glyphinfo->ttychar, glyphinfo->gm.sym.color, flags, tile);
 }
 
 static void viper_raw_print(const char *str) {
