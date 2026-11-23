@@ -69,6 +69,10 @@ viper_data_read
 viper_data_write
 viper_data_remove
 
+# The system keyboard (viper_text_entry_*: elf_app.cpp)
+viper_text_entry_open
+viper_text_entry_poll
+
 # Link play (viper_link.h, docs/design/multiplayer.md "ELF apps")
 viper_link_open
 viper_link_close
