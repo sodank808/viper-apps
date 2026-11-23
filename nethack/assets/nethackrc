@@ -1,0 +1,18 @@
+# NetHack's options on Viper (installed beside app.elf). The app reads this
+# instead of ~/.nethackrc. See NetHack's Guidebook for every option.
+
+# Pick up gold by walking over it, nothing else
+OPTIONS=autopickup,pickup_types:$
+
+# Straight into the game: no splash screen or opening story
+OPTIONS=!splash_screen,!legacy
+
+# What the screen shows
+OPTIONS=color,hilite_pet,lit_corridor,showexp,time
+
+# Menus rather than typed lists, which a gamepad answers better; letters
+# for directions (the d-pad sends them)
+OPTIONS=menustyle:full,number_pad:0
+
+# The tutorial asks first; a new game goes straight in
+OPTIONS=!tutorial

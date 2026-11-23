@@ -142,6 +142,9 @@ static struct win_information window_opts[] = {
 #ifdef SHIM_GRAPHICS
     { "shim", "NetHack Library Windowing Shim", TRUE },
 #endif
+#ifdef VIPER_GRAPHICS /* Viper */
+    { "viper", "Viper", TRUE },
+#endif
 
 #if 0  /* remainder have been retired */
 #ifdef GNOME_GRAPHICS /* unmaintained/defunct */

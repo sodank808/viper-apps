@@ -8,6 +8,12 @@
 #ifndef luaconf_h
 #define luaconf_h
 
+/* Viper: the app's memory tracking, and names in the simulator
+   (../port/nh_sim.h) */
+#ifndef NH_HOST_TOOL
+#include "nh_sim.h"
+#endif
+
 #include <limits.h>
 #include <stddef.h>
 

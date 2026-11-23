@@ -36,6 +36,9 @@
 /* Hint: if you're not developing code, don't define
    ULTRIX_PROTO. */
 
+/* Viper: the app's build settings (port/nhviper.h), before anything else */
+#include "nhviper.h"
+
 #include "config1.h" /* should auto-detect MSDOS, MACOS9, AMIGA, and WIN32 */
 
 /*
@@ -385,7 +388,8 @@
  *
  */
 
-#if defined(UNIX) && !defined(ZLIB_COMP) && !defined(COMPRESS)
+#if defined(UNIX) && !defined(ZLIB_COMP) && !defined(COMPRESS) \
+    && !defined(VIPER_PORT) /* Viper: no compress program to run */
 /* path and file name extension for compression program */
 #define COMPRESS "/usr/bin/compress" /* Lempel-Ziv compression */
 #define COMPRESS_EXTENSION ".Z"      /* compress's extension */
@@ -432,9 +436,12 @@
  *      died due to program or system crashes to be resumed from the point
  *      of the last level change, after running a utility program.
  */
+#ifndef VIPER_PORT /* Viper: no recover program; and fewer writes per level */
 #define INSURANCE /* allow crashed game recovery */
+#endif
 
-#if !defined(MACOS9) && !defined(SHIM_GRAPHICS)
+#if !defined(MACOS9) && !defined(SHIM_GRAPHICS) \
+    && !defined(VIPER_PORT) /* Viper: no chdir(); files have prefixes */
 #define CHDIR /* delete if no chdir() available */
 #endif
 

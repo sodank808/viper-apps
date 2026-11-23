@@ -1,0 +1,18 @@
+# NetHack's system configuration on Viper (installed beside app.elf, read
+# through SYSCONFPREFIX). See NetHack's sys/unix/sysconf for every option.
+
+# Anyone may play in explore mode; nobody in wizard (debug) mode
+EXPLORERS=*
+WIZARDS=
+
+# One hero on a device
+MAXPLAYERS=1
+
+# The high score list
+PERSMAX=10
+ENTRYMAX=100
+POINTSMIN=1
+
+# No debugger or shell to report a panic with
+PANICTRACE_GDB=0
+PANICTRACE_LIBC=0

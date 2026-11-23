@@ -640,7 +640,8 @@ static boolean use_pline_handler = TRUE;
 staticfn void
 execplinehandler(const char *line)
 {
-#if defined(UNIX) && (defined(POSIX_TYPES) || defined(__GNUC__))
+#if defined(UNIX) && (defined(POSIX_TYPES) || defined(__GNUC__)) \
+    && !defined(VIPER_PORT) /* Viper: no processes to run */
     int f;
 #endif
     const char *args[3];
@@ -648,7 +649,8 @@ execplinehandler(const char *line)
     if (!use_pline_handler || !sysopt.msghandler)
         return;
 
-#if defined(UNIX) && (defined(POSIX_TYPES) || defined(__GNUC__))
+#if defined(UNIX) && (defined(POSIX_TYPES) || defined(__GNUC__)) \
+    && !defined(VIPER_PORT) /* Viper: no processes to run */
     f = fork();
     if (f == 0) { /* child */
         args[0] = sysopt.msghandler;

@@ -2046,7 +2046,7 @@ assure_syscf_file(void)
      * VMS overrides open() usage with a macro which requires it.
      */
 #ifndef VMS
-#if defined(NOCWD_ASSUMPTIONS) && defined(WIN32)
+#if defined(NOCWD_ASSUMPTIONS) && (defined(WIN32) || defined(VIPER_PORT)) /* Viper */
     fd = open(fqname(SYSCF_FILE, SYSCONFPREFIX, 0), O_RDONLY);
 #else
     fd = open(SYSCF_FILE, O_RDONLY);

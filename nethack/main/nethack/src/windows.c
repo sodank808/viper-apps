@@ -45,6 +45,9 @@ extern struct window_procs mswin_procs;
 #ifdef SHIM_GRAPHICS
 extern struct window_procs shim_procs;
 #endif
+#ifdef VIPER_GRAPHICS /* Viper: the app's window port (port/winviper.c) */
+extern struct window_procs viper_procs;
+#endif
 #ifdef WINCHAIN
 extern struct window_procs chainin_procs;
 extern void chainin_procs_init(int);
@@ -131,6 +134,9 @@ static struct win_choices {
 #endif
 #ifdef SHIM_GRAPHICS
     { &shim_procs, 0 CHAINR(0) },
+#endif
+#ifdef VIPER_GRAPHICS /* Viper */
+    { &viper_procs, 0 CHAINR(0) },
 #endif
 #ifdef WINCHAIN
     { &chainin_procs, chainin_procs_init, chainin_procs_chain },
