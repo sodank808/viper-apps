@@ -10,3 +10,6 @@ out/
 .vscode/
 .cache/
 __pycache__/
+
+# Wolfenstein 3D's shareware data (wolf3d/tools/fetch_shareware.sh): id's, fetched
+wolf3d/assets/

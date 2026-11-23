@@ -12,3 +12,6 @@
 #       ${VIPER_PUBLIC_APPS}/<app>/main/<x>.cpp)            # they test
 #   target_include_directories(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/<app>/main)
 #   target_include_directories(viper_sim_boot_deps INTERFACE ${VIPER_PUBLIC_APPS}/<app>/main)
+
+# Wolfenstein 3D's app (wolf3d_app.h), whose status its boot tests read
+target_include_directories(viper_sim_boot_deps INTERFACE ${VIPER_PUBLIC_APPS}/wolf3d/main)
