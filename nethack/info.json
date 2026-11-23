@@ -1,0 +1,7 @@
+{
+    "name": "NetHack",
+    "shortname": "NetHack",
+    "type": "NATIVE",
+    "url": "elf://app.viper.nethack",
+    "icon_path": "icon.png"
+}
