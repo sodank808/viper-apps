@@ -7,6 +7,9 @@
 #   make APP=doom     build one
 #   make clean
 #
+# An app whose assets are made from its source (NetHack's nhdat) has a
+# tools/build_assets.sh, which runs before it's built.
+#
 # On a device, apps live in apps/<bundle id>/ on the SD card (or fatfs). Copy
 # the folders in out/sdcard/elf_apps/ and out/fatfs/apps/ there.
 #
@@ -22,7 +25,7 @@ INSTALL := sdk/tools/install_app.sh
 # the firmware's fatfs image; list them in SDCARD_APPS.
 FATFS_APPS_DIR ?= out/fatfs/apps
 SDCARD_APPS_DIR ?= out/sdcard/elf_apps
-SDCARD_APPS := doom wolf3d
+SDCARD_APPS := doom nethack wolf3d
 
 # Every folder with a CMakeLists.txt is an app project (sdk/ has none)
 APPS := $(patsubst %/CMakeLists.txt,%,$(wildcard */CMakeLists.txt))
@@ -35,6 +38,7 @@ all:
 	@for app in $(APPS); do \
 		if [ ! -f "$$app/CMakeLists.txt" ]; then echo "Error: no app '$$app'"; exit 1; fi; \
 		echo "Building $$app..."; \
+		if [ -x "$$app/tools/build_assets.sh" ]; then "$$app/tools/build_assets.sh" || exit 1; fi; \
 		(cd "$$app" && idf.py elf) || exit 1; \
 		case " $(SDCARD_APPS) " in *" $$app "*) dest="$(SDCARD_APPS_DIR)";; *) dest="$(FATFS_APPS_DIR)";; esac; \
 		mkdir -p "$$dest"; \

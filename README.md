@@ -37,6 +37,7 @@ The repo, the SDK and the tooling are MIT ([`LICENSE`](LICENSE); LVGL's headers 
 | App | License | Third-party code |
 | --- | --- | --- |
 | [Doom](doom/) | GPL-2.0 | PrBoom, by way of [esp-cpp/prboom](https://github.com/esp-cpp/prboom) (`doom/main/prboom/COPYING`) |
+| [NetHack](nethack/) | NetHack General Public License; Lua under MIT | [NetHack 5.0.0](https://github.com/NetHack/NetHack) and the Lua 5.4.8 it bundles (`nethack/main/nethack/LICENSE`, `nethack/main/lua/lua.h`) |
 | [Wolfenstein 3D](wolf3d/) | GPL-2.0 | [Wolf4SDL](https://github.com/KS-Presto/Wolf4SDL), the port of id Software's source, with DOSBox's OPL emulator (`wolf3d/main/engine/license-gpl.txt`, `license-id.txt`) |
 
 Game data (WADs, ROMs) is never committed here except where its license allows redistribution.
