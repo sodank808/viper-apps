@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "gfx/font_unscii8.hpp"
+#include "nethack_first_person.hpp"
 #include "nethack_tiles.hpp"
 
 namespace nethack {
@@ -44,7 +45,9 @@ constexpr gfx::Pixel kColors[16] = {
     gfx::rgb(255, 255, 255), // white
 };
 
-gfx::Pixel dimmed(gfx::Pixel p) { return gfx::blend(kBackground, p, 0x9000); }
+// What the hero remembers but doesn't see: 18/32 of its color (blend's
+// amount is out of 32)
+gfx::Pixel dimmed(gfx::Pixel p) { return gfx::blend(kBackground, p, 18); }
 
 // Text clipped to `cols` characters
 void text(gfx::Surface &s, const std::string &t, int x, int y, gfx::Pixel c, int cols = 1000) {
@@ -419,7 +422,11 @@ void draw(gfx::Surface &s, const Model &m, const ViewState &v) {
     default:
         break;
     }
-    if (v.map_view != MapView::Terminal && v.tiles && v.tiles->is_open()) {
+    const bool tiles = v.map_view != MapView::Terminal && v.tiles && v.tiles->is_open();
+    if (tiles && v.map_view == MapView::FirstPerson && v.first_person && !m.getpos) {
+        const int height = l.status_y - 2 - l.map_y;
+        v.first_person->draw(s, l.map_y, height, m, *v.tiles, v.camera, v.facing);
+    } else if (tiles) {
         draw_tiles(s, m, l, *v.tiles, v.map_view == MapView::SmallTiles);
     } else {
         draw_map(s, m, l);

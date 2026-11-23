@@ -320,7 +320,7 @@ void tap_select() {
 
 } // namespace
 
-TEST_CASE("NetHack's views: Select cycles terminal, tiles and small tiles",
+TEST_CASE("NetHack's views: Select cycles terminal, tiles, small tiles and first person",
           "[boot][apps][nethack]") {
     boot_to_home();
     Installed app;
@@ -330,8 +330,8 @@ TEST_CASE("NetHack's views: Select cycles terminal, tiles and small tiles",
     // Each view draws the map its own way; the game doesn't notice
     const auto turn = model().status;
     std::vector<std::vector<uint16_t>> screens;
-    const char *const names[] = {"11_terminal", "12_tiles", "13_small_tiles"};
-    for (int view = 0; view < 3; view++) {
+    const char *const names[] = {"11_terminal", "12_tiles", "13_small_tiles", "14_first_person"};
+    for (int view = 0; view < 4; view++) {
         CHECK(nethack::app_status().map_view == view);
         run_frames(2);
         shot(names[view]);
@@ -348,9 +348,11 @@ TEST_CASE("NetHack's views: Select cycles terminal, tiles and small tiles",
     CHECK_FALSE(nethack::app_status().game_menu_open);
     tap_select();
     tap_select();
+    tap_select();
     REQUIRE(nethack::app_status().map_view == 0);
     CHECK(screens[0] != screens[1]);
     CHECK(screens[1] != screens[2]);
+    CHECK(screens[2] != screens[3]);
     CHECK(model().status == turn);
     CHECK(app_running());
 
@@ -361,6 +363,7 @@ TEST_CASE("NetHack's views: Select cycles terminal, tiles and small tiles",
     open_nethack();
     play_until_command();
     CHECK(nethack::app_status().map_view == 1);
+    tap_select();
     tap_select();
     tap_select(); // back to the terminal, for the tests after this one
     CHECK(nethack::app_status().map_view == 0);
@@ -397,7 +400,7 @@ uint64_t state_hash() {
     return h;
 }
 
-// A new game from `seed`, played by the same buttons each time; the state
+// A new game from `seed`, played by the same keys each time; the state
 // after each turn. With switch_views, Select is tapped after every turn.
 std::vector<uint64_t> scripted_game(unsigned long seed, bool switch_views) {
     fs::remove_all(data_dir());
@@ -405,11 +408,12 @@ std::vector<uint64_t> scripted_game(unsigned long seed, bool switch_views) {
     open_nethack();
     play_until_command();
     std::vector<uint64_t> states{state_hash()};
-    const B moves[] = {B::LEFT,  B::LEFT, B::UP,   B::RIGHT, B::DOWN, B::DOWN, B::RIGHT, B::RIGHT,
-                       B::RIGHT, B::UP,   B::LEFT, B::DOWN,  B::LEFT, B::UP,   B::RIGHT, B::DOWN};
+    // NetHack's own keys: the d-pad means something else in the first-person
+    // view (as the hero faces), and this is about drawing, not the buttons
+    const char moves[] = "hhkljjlllkhjhklj";
     for (int round = 0; round < 2; round++) {
-        for (B dir : moves) {
-            press(button(dir));
+        for (const char *key = moves; *key; key++) {
+            nethack::engine_answer_key(*key);
             run_frames(8);
             // Whatever it asks, the same answer each time
             REQUIRE(run_until(
@@ -461,6 +465,63 @@ TEST_CASE("NetHack's views only draw: switching every turn plays the same game",
     }
     // And the seed is what made them the same: another plays another game
     CHECK(scripted_game(777, false).back() != plain.back());
+}
+
+TEST_CASE("NetHack's first-person view: turning, stepping the way the hero faces",
+          "[boot][apps][nethack]") {
+    boot_to_home();
+    Installed app;
+    fs::remove_all(data_dir());
+    const Seeded seeded(1);
+    open_nethack();
+    play_until_command();
+    for (int i = 0; i < 3; i++) {
+        tap_select();
+    }
+    REQUIRE(nethack::app_status().map_view == 3);
+    run_frames(10);
+    shot("15_first_person");
+
+    // Left and Right turn the view: a quarter turn each, and no game turn
+    const auto status = model().status;
+    const int facing = nethack::app_status().facing;
+    press(button(B::RIGHT));
+    run_frames(12);
+    CHECK(nethack::app_status().facing == (facing + 1) % 4);
+    press(button(B::LEFT));
+    run_frames(12);
+    CHECK(nethack::app_status().facing == facing);
+    CHECK(model().status == status);
+    CHECK(asked() == nethack::Ask::Key);
+
+    // Turn to face open floor with nothing on it, and step: the hero moves
+    // that way
+    static constexpr int kDx[4] = {0, 1, 0, -1}, kDy[4] = {-1, 0, 1, 0};
+    const auto open_ahead = [] {
+        const int f = nethack::app_status().facing;
+        const auto &c = model().cell(model().hero_x + kDx[f], model().hero_y + kDy[f]);
+        return c.terrain == NHV_TERRAIN_FLOOR && c.tile == c.terrain_tile;
+    };
+    for (int turns = 0; turns < 4 && !open_ahead(); turns++) {
+        press(button(B::RIGHT));
+        run_frames(12);
+    }
+    REQUIRE(open_ahead());
+    const int f = nethack::app_status().facing;
+    const int x = model().hero_x, y = model().hero_y;
+    press(button(B::UP));
+    run_frames(12);
+    back_to_commands();
+    CHECK(model().hero_x == x + kDx[f]);
+    CHECK(model().hero_y == y + kDy[f]);
+    run_frames(12);
+    shot("16_first_person_step");
+
+    // Back where the tests after this one expect the view
+    tap_select();
+    REQUIRE(nethack::app_status().map_view == 0);
+    close_nethack();
+    fs::remove_all(data_dir());
 }
 
 TEST_CASE("NetHack types a line on the system keyboard", "[boot][apps][nethack]") {

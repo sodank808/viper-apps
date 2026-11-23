@@ -53,9 +53,24 @@ void nhv_nethack_main(const char *app_dir, const char *data_dir, const char *nam
 
 /* ---- the map ---- */
 void nhv_map_clear(void);
+/* What a cell's ground is, for the first-person view: from the terrain
+ * under whatever is shown there (NetHack's background glyph) */
+enum nhv_terrain {
+    NHV_TERRAIN_UNKNOWN = 0, /* never seen, or solid rock */
+    NHV_TERRAIN_WALL,        /* walls, trees, iron bars */
+    NHV_TERRAIN_DOOR,        /* a closed door, a raised drawbridge */
+    NHV_TERRAIN_FLOOR,       /* rooms, doorways, open doors, ice, ... */
+    NHV_TERRAIN_CORRIDOR,
+    NHV_TERRAIN_FEATURE, /* stairs, altars, fountains, traps, ... on a floor */
+    NHV_TERRAIN_LIQUID,  /* water, lava */
+};
+
 /* ch: the character NetHack would show; color 0..15 (NetHack's CLR_*);
- * tile: its tile (tiles.bin, numbered as src/tile.c), -1 for none */
-void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, int tile);
+ * tile: its tile (tiles.bin, numbered as src/tile.c), -1 for none;
+ * terrain: NHV_TERRAIN_*, and terrain_tile the terrain's own tile (-1 for
+ * none) */
+void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, int tile,
+                   int terrain, int terrain_tile);
 /* Where the hero is (NetHack's cliparound) */
 void nhv_map_hero(int x, int y);
 

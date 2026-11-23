@@ -54,6 +54,9 @@ bool TileSet::open(const std::string &path) {
     small_.pixels = kSmall * kSmall;
     setup(big_.data, big_.tile_of, big_.slot, big_.pixels, count);
     setup(small_.data, small_.tile_of, small_.slot, small_.pixels, count);
+    textures_.pixels = kSize * kSize;
+    setup(textures_.data, textures_.tile_of, textures_.slot, textures_.pixels, count * 4);
+    texture_.assign(kSlots, raycast::Texture{});
     return true;
 }
 
@@ -66,6 +69,8 @@ void TileSet::close() {
     palette_.clear();
     big_ = Cache{};
     small_ = Cache{};
+    textures_ = Cache{};
+    texture_.clear();
 }
 
 bool TileSet::read(int t, uint8_t *indexes) {
@@ -112,6 +117,49 @@ const gfx::Pixel *TileSet::cached(Cache &c, int t) {
         }
     }
     return out;
+}
+
+const raycast::Texture *TileSet::texture(int t, Look look) {
+    if (!file_ || t < 0 || t >= count_) {
+        return nullptr;
+    }
+    const int key = t * 4 + static_cast<int>(look);
+    Cache &c = textures_;
+    const int16_t s = c.slot[static_cast<size_t>(key)];
+    if (s >= 0) {
+        return &texture_[static_cast<size_t>(s)];
+    }
+    uint8_t indexes[kSize * kSize];
+    if (!read(t, indexes)) {
+        return nullptr;
+    }
+    const int slot = c.next;
+    c.next = (c.next + 1) % kSlots;
+    if (c.tile_of[slot] >= 0) {
+        c.slot[static_cast<size_t>(c.tile_of[slot])] = -1;
+    }
+    c.tile_of[slot] = key;
+    c.slot[static_cast<size_t>(key)] = static_cast<int16_t>(slot);
+    gfx::Pixel *out = &c.data[static_cast<size_t>(slot) * c.pixels];
+    const bool sprite = look == Look::Sprite || look == Look::SpriteDim;
+    const bool dim = look == Look::OpaqueDim || look == Look::SpriteDim;
+    for (int y = 0; y < kSize; y++) {
+        for (int x = 0; x < kSize; x++) {
+            const uint8_t i = indexes[y * kSize + x];
+            gfx::Pixel p = palette_[i];
+            if (i == 0 && sprite) {
+                p = raycast::kClear;
+            } else if (dim) {
+                p = gfx::rgb(gfx::scale(gfx::unpack(p), 110));
+            }
+            if (p == raycast::kClear && !(i == 0 && sprite)) {
+                p ^= 0x0020; // a real pixel that happens to be the clear color
+            }
+            out[x * kSize + y] = p; // column-major
+        }
+    }
+    texture_[static_cast<size_t>(slot)] = raycast::Texture{out, 4};
+    return &texture_[static_cast<size_t>(slot)];
 }
 
 const gfx::Pixel *TileSet::tile(int t, bool small) {

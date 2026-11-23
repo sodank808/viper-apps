@@ -16,6 +16,9 @@
 
 #define MAX_WINDOWS 64
 
+/* Each glyph's tile (src/tile.c), for the terrain under what's shown */
+extern glyph_map glyphmap[MAX_GLYPH];
+
 struct vwin {
     int used;
     int kind;
@@ -37,6 +40,9 @@ static void viper_init_nhwindows(int *argcp UNUSED, char **argv UNUSED) {
     memset(windows, 0, sizeof windows);
     memset(status_lines, 0, sizeof status_lines);
     iflags.window_inited = TRUE;
+    /* print_glyph() gets what's under monsters and objects, for the
+       first-person view */
+    iflags.use_background_glyph = TRUE;
     iflags.use_color = TRUE;
 }
 
@@ -301,10 +307,63 @@ static void viper_cliparound(int x, int y) { nhv_map_hero(x, y); }
 
 /* ---- the map ---- */
 
+/* What kind of ground a map symbol is (nh_port.h's NHV_TERRAIN_*) */
+static int terrain_of(int glyph) {
+    if (glyph_is_unexplored(glyph) || !glyph_is_cmap(glyph))
+        return NHV_TERRAIN_UNKNOWN;
+    switch (glyph_to_cmap(glyph)) {
+    case S_stone:
+        return NHV_TERRAIN_UNKNOWN;
+    case S_vwall:
+    case S_hwall:
+    case S_tlcorn:
+    case S_trcorn:
+    case S_blcorn:
+    case S_brcorn:
+    case S_crwall:
+    case S_tuwall:
+    case S_tdwall:
+    case S_tlwall:
+    case S_trwall:
+    case S_bars:
+    case S_tree:
+    case S_lavawall:
+        return NHV_TERRAIN_WALL;
+    case S_vcdoor:
+    case S_hcdoor:
+    case S_vcdbridge:
+    case S_hcdbridge:
+        return NHV_TERRAIN_DOOR;
+    case S_corr:
+    case S_litcorr:
+    case S_engrcorr:
+        return NHV_TERRAIN_CORRIDOR;
+    case S_pool:
+    case S_water:
+    case S_lava:
+        return NHV_TERRAIN_LIQUID;
+    case S_ndoor:
+    case S_vodoor:
+    case S_hodoor:
+    case S_room:
+    case S_darkroom:
+    case S_engroom:
+    case S_ice:
+    case S_air:
+    case S_cloud:
+    case S_vodbridge:
+    case S_hodbridge:
+        return NHV_TERRAIN_FLOOR;
+    default: /* stairs, ladders, altars, graves, thrones, sinks, fountains,
+                traps, webs */
+        return NHV_TERRAIN_FEATURE;
+    }
+}
+
 static void viper_print_glyph(winid w UNUSED, coordxy x, coordxy y, const glyph_info *glyphinfo,
-                              const glyph_info *bkglyphinfo UNUSED) {
+                              const glyph_info *bkglyphinfo) {
     unsigned gf = glyphinfo->gm.glyphflags, flags = 0;
-    int tile;
+    int tile, terrain_glyph, terrain, terrain_tile = -1;
 
     if (gf & MG_PET)
         flags |= NHV_CELL_PET;
@@ -324,7 +383,15 @@ static void viper_print_glyph(winid w UNUSED, coordxy x, coordxy y, const glyph_
     if (glyph_is_unexplored(glyphinfo->glyph) ||
         (glyph_is_cmap(glyphinfo->glyph) && glyph_to_cmap(glyphinfo->glyph) == S_stone))
         tile = -1;
-    nhv_map_glyph(x, y, glyphinfo->glyph, glyphinfo->ttychar, glyphinfo->gm.sym.color, flags, tile);
+    /* The ground: the symbol itself, or what's under the monster or object
+       shown (use_background_glyph) */
+    terrain_glyph =
+        glyph_is_cmap(glyphinfo->glyph) || !bkglyphinfo ? glyphinfo->glyph : bkglyphinfo->glyph;
+    terrain = terrain_of(terrain_glyph);
+    if (terrain != NHV_TERRAIN_UNKNOWN && terrain_glyph >= 0 && terrain_glyph < MAX_GLYPH)
+        terrain_tile = glyphmap[terrain_glyph].tileidx;
+    nhv_map_glyph(x, y, glyphinfo->glyph, glyphinfo->ttychar, glyphinfo->gm.sym.color, flags, tile,
+                  terrain, terrain_tile);
 }
 
 static void viper_raw_print(const char *str) {
