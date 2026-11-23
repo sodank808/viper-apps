@@ -67,7 +67,7 @@ extern "C" {
  * arrived in, check_app_elf.py reports the level an app needs, and its
  * installed info.json says so as "min_api". viper_api_level() is the running
  * firmware's. Written by check_exports_lock.py --update; don't edit. */
-#define VIPER_API_LEVEL 2
+#define VIPER_API_LEVEL 3
 
 typedef enum {
     VIPER_RENDER_LVGL = 0,        /* build an LVGL UI under the container */
