@@ -483,6 +483,12 @@ int nhv_get_key(void) {
 }
 
 char nhv_yn(const char *query, const char *choices, char def) {
+    // A key the app sent ahead answers it ("o" then a direction)
+    if (!g->queued.empty()) {
+        const char key = g->queued.front();
+        g->queued.erase(g->queued.begin());
+        return key;
+    }
     nethack::Request r;
     r.ask = nethack::Ask::YesNo;
     r.query = query ? query : "";
@@ -505,13 +511,56 @@ char nhv_yn(const char *query, const char *choices, char def) {
 }
 
 void nhv_getlin(const char *query, char *buf, size_t size) {
-    // Typing comes with the on-screen keyboard (Phase 2); until then a
-    // prompt for a line is cancelled
-    (void)query;
-    if (size >= 2) {
-        buf[0] = nethack::kEsc;
-        buf[1] = '\0';
+    if (size == 0) {
+        return;
     }
+    nethack::Request r;
+    r.ask = nethack::Ask::Line;
+    r.query = query ? query : "";
+    std::string line(1, nethack::kEsc);
+    if (wait_answer(r)) {
+        line = g->line;
+        g->model.new_messages = 0;
+    } else if (++g->stop_keys > nethack::kStopKeys) {
+        nhv_exit(0);
+    }
+    const size_t n = std::min(line.size(), size - 1);
+    std::memcpy(buf, line.data(), n);
+    buf[n] = '\0';
+}
+
+void nhv_context(unsigned here, unsigned doors) {
+    if (g->model.here != here || g->model.doors != doors) {
+        g->model.here = here;
+        g->model.doors = doors;
+        g->model.changes++;
+    }
+}
+
+void nhv_getpos(const char *goal) {
+    g->model.getpos = goal != nullptr;
+    g->model.getpos_goal = goal ? goal : "";
+    g->model.changes++;
+}
+
+void nhv_map_cursor(int x, int y) {
+    if (g->model.cursor_x != x || g->model.cursor_y != y) {
+        g->model.cursor_x = x;
+        g->model.cursor_y = y;
+        g->model.changes++;
+    }
+}
+
+int nhv_queued_line(char *buf, size_t size) {
+    const size_t end = g->queued.find('\n');
+    if (end == std::string::npos || size == 0) {
+        return 0;
+    }
+    const size_t n = std::min(end, size - 1);
+    std::memcpy(buf, g->queued.data(), n);
+    buf[n] = '\0';
+    g->queued.erase(0, end + 1);
+    return 1;
 }
 
 void nhv_exit(int status) {

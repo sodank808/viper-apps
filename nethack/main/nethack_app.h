@@ -11,7 +11,8 @@ namespace nethack {
 struct AppStatus {
     bool open = false;
     std::string message; // the message shown instead of the game, if any
-    bool commands_open = false;
+    bool commands_open = false;  // the command list (Y)
+    bool game_menu_open = false; // the game menu (Start)
     uint32_t frames = 0; // drawn
 };
 

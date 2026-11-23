@@ -1,26 +1,26 @@
 # NetHack
 
-Status: plays in the host simulator and on a Proto1 with the terminal view (Phase 1 of the firmware repo's `docs/plans/nethack_port.md`); tiles, the first-person view and typing are to come. Current as of 2026-11-22.
+Status: plays in the host simulator and on a Proto1 with the terminal view and gamepad controls (Phases 1 and 2 of the firmware repo's `docs/plans/nethack_port.md`); tiles and the first-person view are to come. Current as of 2026-11-22.
 
-[NetHack 5.0.0](https://www.nethack.org/v500/release.html) as an ELF app: the whole game, unchanged but for a few marked lines, with a window port and a platform of its own for Viper, and a terminal view drawn into the frame. It needs firmware that loads apps bigger than the heap (the ELF loader's spare block) and exports what NetHack calls (`sdk/exports/libc.txt`, the double-precision math, stdio reads, time, and `open`/`read`/`write`/`lseek`/`unlink`); older firmware refuses it when it's installed, naming what's missing.
+[NetHack 5.0.0](https://www.nethack.org/v500/release.html) as an ELF app: the whole game, unchanged but for a few marked lines, with a window port and a platform of its own for Viper, and a terminal view drawn into the frame. It needs firmware that loads apps bigger than the heap (the ELF loader's spare block), exports what NetHack calls (`sdk/exports/libc.txt`, the double-precision math, stdio reads, time, and `open`/`read`/`write`/`lseek`/`unlink`) and has the system keyboard (`viper_text_entry_open()`, API level 4); older firmware refuses it when it's installed, naming what's missing.
 
 ## Playing
 
-| Button | Playing | In a question | In a menu |
-| --- | --- | --- | --- |
-| D-pad | Move (two at once: diagonally); held, it repeats | Left/Right: choose; a direction, where one is asked | Move; Left/Right a page |
-| A | The command list (pick up, eat, read, stairs, pray, save, ...) | Answer; "here" or the list of objects | Choose, or mark (in a list of several) |
-| B | Escape | Cancel | Cancel |
-| X | Inventory | All objects (`*`) | Done (several) |
-| Y | Search | | |
-| L / R | Up / down stairs | | Page |
-| Start | Extended commands (`#pray`, `#loot`, ...) | | Done (several) |
+| Button | Playing | Choosing a position | In a question | In a menu |
+| --- | --- | --- | --- | --- |
+| D-pad | Move (two at once: diagonally); held, it repeats | Move the cursor | Left/Right: choose; a direction, where one is asked | Move; Left/Right a page |
+| A | What's obvious here (the hints line names it): stairs, pick up, open the door next to you, drink from a fountain, sit on a throne; else search | Pick | Answer; "here" or the list of objects | Choose, or mark (in a list of several) |
+| B | Escape | Cancel | Cancel (`n` or `q` where Escape isn't an answer) | Cancel |
+| X | Inventory: choose an item for what to do with it | Next monster | All objects (`*`) | Done (several) |
+| Y | The command list (eat, read, wear, throw, far look, travel, ...), the last used first | Next object | | |
+| L / R | Up / down stairs | Stairs | | Page |
+| Start | The game menu: extended commands, options, help, discoveries, the overview, save and quit | Back to the hero | | Done (several) |
 
 Holding Select closes the app, as in any app, and saves the game; opening it again restores it. A game that ends (death, quitting, ascending) closes the app.
 
-Typing (naming things, wishes, engraving text) isn't there yet: a prompt for a line of text is cancelled. The on-screen keyboard is Phase 2.
+A prompt for a line of text (naming things, wishes, engraving) opens the system keyboard: A types the key under the cursor, B deletes, Start is done.
 
-The hero is always "Viper", and its role, race, gender and alignment are chosen with NetHack's own questions (A to let it pick). The options it starts with are in `assets/nethackrc` (no tutorial, no opening story, autopickup of gold, menus rather than typed lists).
+The hero is always "Viper", and its role, race, gender and alignment are chosen with NetHack's own questions (A to let it pick). The options it starts with are in `assets/nethackrc` (no tutorial, no opening story, no tips, autopickup of gold, menus rather than typed lists); a restored game keeps the options it was saved with.
 
 ## Layout
 
@@ -29,13 +29,14 @@ The hero is always "Viper", and its role, race, gender and alignment are chosen 
   - `winprocs.h`, `windows.c`, `mdlib.c`, `role.c`, `rip.c`: the `viper` window port, and NetHack's generic role menus and text tombstone for it.
   - `cfgfiles.c`: `sysconf` is found by prefix, as on Windows.
   - `pline.c`: no message handler program (no processes).
+  - `getpos.c`: `getpos()` tells the window port while a position is being chosen, so the app shows a cursor.
   - `include/nhlua.h` is written by hand (upstream's Makefile generates it).
 - `main/lua/`: the Lua 5.4.8 NetHack bundles, minus `lua.c` and `luac.c`. `luaconf.h` includes `port/nh_sim.h` (marked `Viper:`).
 - `main/port/`: NetHack's window port (`winviper.c`) and platform (`viper_sys.c`: starting a game, the file prefixes, the lock file, the Unix calls NetHack expects), the C interface between them and the app (`nh_port.h`), and the build's settings (`nhviper.h`, `nh_sim.h`, `nh_libc.h`, `nh_stubs.c`, `nh_names.h`).
 - `main/nethack_engine.cpp`: the engine's thread, the turn between it and `loop()`, and the game model's side of `nh_port.h`.
 - `main/nethack_game.hpp`: the game model (map, messages, status, windows, what the engine waits for). Plain C++.
 - `main/nethack_view.cpp`: the terminal view and the menus, text windows and questions drawn over it.
-- `main/nethack_app.cpp`: the app (`viper_app_t`), the buttons, the command list.
+- `main/nethack_app.cpp`: the app (`viper_app_t`), the buttons, the context action, the command list and game menu.
 - `upstream/`: what the game's data is made from (`dat/`, and `util/`'s `makedefs` and `dlb`), not built into the app.
 - `assets/`: installed beside `app.elf`: `sysconf`, `nethackrc`, and `nhdat` (built, gitignored).
 - `tools/make_nhdat.sh`: builds `makedefs` and `dlb` for the host from the vendored sources and packs `assets/nhdat`. The repo's `make` runs it (`tools/build_assets.sh`); so does the firmware repo's simulator build, for the tests.
@@ -44,6 +45,7 @@ The hero is always "Viper", and its role, race, gender and alignment are chosen 
 ## How it runs
 
 - **The engine's thread.** NetHack is a program that waits for a key wherever it pleases. It runs on a thread of its own (64 KB of stack on a device), and wherever the window port waits for the player (a key, a yes/no, a menu, a text window, `--More--`) it hands the turn to `loop()` with a request and waits for the answer, through a mutex and a condition variable. Only one side runs at a time, so the model needs no locks: the view reads it only while the engine waits. `loop()` waits up to 100 ms for the engine (5 s in the simulator); a level being made carries on into the next frame.
+- **The context action** comes from NetHack's own state: before each key it reads, the window port says what's under and next to the hero (stairs, objects the hero can reach, a fountain, the closed doors it remembers; `nhv_context()`), and the app picks A's command from that.
 - **The window port** (`port/winviper.c`) draws nothing: it records what NetHack shows into the game model (the map's glyphs, messages, the status lines from NetHack's own `genl_status_update()`, menus and text windows) and turns NetHack's questions into requests. NetHack's menu identifiers stay on its side; the model sees indexes.
 - **Files** have prefixes (`fqn_prefix[]`), never a current directory: the data (`nhdat`, `sysconf`, `nethackrc`) in the app's folder, levels, saves and scores in its data folder (`viper_data_path()`).
 - **Leaving.** NetHack's `exit()` (the end of a game, an error) goes back to the top of the engine's thread with `longjmp()` (`nhv_exit()`). Closing the app mid-game answers the engine's next questions with Escape and `S` (and "yes" to "Really save?") until it has saved.
@@ -66,7 +68,7 @@ The simulator compiles every ELF app into one program, which brings two things a
 - **Names.** NetHack's and Lua's globals (`level`, `flags`, `panic`, `lua_newstate`, ...) would meet other apps' and the firmware's own Lua. `port/nh_names.h`, included through `port/nh_sim.h` by every NetHack, Lua and port file, gives each the prefix `nh_`. Run `tools/gen_names.py` after adding or removing a global.
 - **Globals keep their values** from one game to the next. Built with Clang, NetHack's and Lua's variables are in sections of their own (`port/nh_sim.h`), which the app copies when it first starts a game and puts back before each new one.
 
-Its tests are in `tests/`: `test_nethack_model.cpp` (the model) and `test_nethack_boot.cpp` (a game started, played, saved by closing the app and restored; and three games in a row, freeing everything). `VIPER_SIM_NETHACK_SHOTS=<dir>` saves their screens.
+Its tests are in `tests/`: `test_nethack_model.cpp` (the model, and how text windows wrap) and `test_nethack_boot.cpp` (a game started, played, saved by closing the app and restored; the buttons: context action, game menu, options, help, item actions, the position cursor; typing an engraving on the keyboard; and three games in a row, freeing everything). `VIPER_SIM_NETHACK_SHOTS=<dir>` saves their screens.
 
 ## License
 

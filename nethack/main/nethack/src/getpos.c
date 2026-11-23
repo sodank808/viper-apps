@@ -765,10 +765,27 @@ getpos_refresh(void)
     }
 }
 
-/* have the player use movement keystrokes to position the cursor at a
-   particular map location, then use one of [.,:;] to pick the spot */
+/* Viper: getpos() tells the window port while a position is chosen, so the
+   app shows a cursor and its buttons pick positions (getpos_body() is
+   upstream's getpos()) */
+extern void nhv_getpos(const char *goal);
+staticfn int getpos_body(coord *ccp, boolean force, const char *goal);
+
 int
 getpos(coord *ccp, boolean force, const char *goal)
+{
+    int result;
+
+    nhv_getpos(goal ? goal : "");
+    result = getpos_body(ccp, force, goal);
+    nhv_getpos(NULL);
+    return result;
+}
+
+/* have the player use movement keystrokes to position the cursor at a
+   particular map location, then use one of [.,:;] to pick the spot */
+staticfn int
+getpos_body(coord *ccp, boolean force, const char *goal)
 {
     static struct {
         int nhkf, ret;

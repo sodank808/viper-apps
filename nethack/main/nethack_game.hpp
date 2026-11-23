@@ -75,6 +75,14 @@ struct Model {
     // a device's firmware exports only some of the C++ runtime a map needs.
     static constexpr int kMaxWindows = 64;
     std::array<Window, kMaxWindows> windows{};
+    // What the context action (A) acts on, as of the last key asked for
+    // (nh_port.h's nhv_context())
+    unsigned here = 0;  // NHV_HERE_*
+    unsigned doors = 0; // closed doors next to the hero, by direction
+    // A position being chosen (getpos): what for, and the cursor
+    bool getpos = false;
+    std::string getpos_goal;
+    int cursor_x = 0, cursor_y = 0;
     Request request;
     uint32_t request_id = 0; // counts requests, so a view knows a new one began
     uint32_t changes = 0;    // counts every change, so a view knows to redraw

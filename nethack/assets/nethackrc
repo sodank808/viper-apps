@@ -16,3 +16,6 @@ OPTIONS=menustyle:full,number_pad:0
 
 # The tutorial asks first; a new game goes straight in
 OPTIONS=!tutorial
+
+# No tips: they name keyboard keys the buttons don't have
+OPTIONS=!tips

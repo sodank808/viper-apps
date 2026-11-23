@@ -30,5 +30,6 @@ add_dependencies(viper_sim_app_boot_tests nethack_sim_data)
 target_compile_definitions(viper_sim_app_boot_tests PRIVATE
     VIPER_SIM_NETHACK_DATA="${NETHACK_SIM_DATA}")
 target_include_directories(viper_sim_boot_deps INTERFACE ${VIPER_PUBLIC_APPS}/nethack/main)
-target_sources(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/tests/test_nethack_model.cpp)
+target_sources(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/tests/test_nethack_model.cpp
+    ${VIPER_PUBLIC_APPS}/nethack/main/nethack_view.cpp)
 target_include_directories(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/main)

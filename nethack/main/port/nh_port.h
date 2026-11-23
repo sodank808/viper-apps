@@ -89,6 +89,32 @@ char nhv_yn(const char *query, const char *choices, char def);
 /* Waits for a line of text; "\033" in buf if cancelled */
 void nhv_getlin(const char *query, char *buf, size_t size);
 
+/* ---- what the context action (A) acts on ---- */
+enum nhv_here {
+    NHV_HERE_OBJECTS = 1 << 0, /* objects the hero can reach */
+    NHV_HERE_UPSTAIRS = 1 << 1,
+    NHV_HERE_DOWNSTAIRS = 1 << 2,
+    NHV_HERE_FOUNTAIN = 1 << 3,
+    NHV_HERE_THRONE = 1 << 4,
+    NHV_HERE_SINK = 1 << 5,
+    NHV_HERE_ALTAR = 1 << 6,
+};
+/* Before each key is read, while a game is going: here, NHV_HERE_* at the
+ * hero; doors, the closed doors the hero sees next to it, a bit per direction
+ * in NetHack's order (xdir[]/ydir[]: west, northwest, north, northeast, east,
+ * southeast, south, southwest) */
+void nhv_context(unsigned here, unsigned doors);
+
+/* ---- positions (getpos: travel, far look, throwing at a spot) ---- */
+/* A position is being chosen (goal: what for), or no longer (NULL) */
+void nhv_getpos(const char *goal);
+/* Where the cursor is while one is chosen */
+void nhv_map_cursor(int x, int y);
+
+/* An extended command's name the app queued (keys up to a newline), if the
+ * next keys queued are one; 0 if not */
+int nhv_queued_line(char *buf, size_t size);
+
 /* ---- the platform ---- */
 /* NetHack is done: goes back to the top of the engine's thread */
 #ifdef __GNUC__

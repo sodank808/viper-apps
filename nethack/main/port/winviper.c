@@ -140,11 +140,13 @@ static void viper_destroy_nhwindow(winid w) {
     memset(vw, 0, sizeof *vw);
 }
 
-static void viper_curs(winid w, int x UNUSED, int y) {
+static void viper_curs(winid w, int x, int y) {
     struct vwin *vw = win_of(w);
 
     if (vw && vw->kind == NHV_WIN_STATUS)
         vw->status_row = y;
+    if (vw && vw->kind == NHV_WIN_MAP)
+        nhv_map_cursor(x, y);
 }
 
 /* Status text with the gold glyph encoded (\GXXXXNNNN) shows '$' */
@@ -325,11 +327,54 @@ static void viper_raw_print(const char *str) {
 
 /* ---- input ---- */
 
-static int viper_nhgetch(void) { return nhv_get_key(); }
+/* What the context action acts on, from what the hero knows */
+static void update_context(void) {
+    unsigned here = 0, doors = 0;
+    stairway *stair;
+    int typ;
+
+    if (!program_state.in_moveloop || !isok(u.ux, u.uy) || u.uswallow) {
+        nhv_context(0, 0);
+        return;
+    }
+    if ((stair = stairway_at(u.ux, u.uy)) != 0)
+        here |= stair->up ? NHV_HERE_UPSTAIRS : NHV_HERE_DOWNSTAIRS;
+    if (OBJ_AT(u.ux, u.uy) && can_reach_floor(FALSE))
+        here |= NHV_HERE_OBJECTS;
+    typ = levl[u.ux][u.uy].typ;
+    if (IS_FOUNTAIN(typ))
+        here |= NHV_HERE_FOUNTAIN;
+    if (IS_THRONE(typ))
+        here |= NHV_HERE_THRONE;
+    if (IS_SINK(typ))
+        here |= NHV_HERE_SINK;
+    if (IS_ALTAR(typ))
+        here |= NHV_HERE_ALTAR;
+    for (int i = 0; i < 8; i++) {
+        coordxy x = u.ux + xdir[i], y = u.uy + ydir[i];
+        int glyph, cmap;
+
+        if (!isok(x, y))
+            continue;
+        glyph = levl[x][y].glyph; /* as the hero remembers it */
+        if (!glyph_is_cmap(glyph))
+            continue;
+        cmap = glyph_to_cmap(glyph);
+        if (cmap == S_vcdoor || cmap == S_hcdoor)
+            doors |= 1u << i;
+    }
+    nhv_context(here, doors);
+}
+
+static int viper_nhgetch(void) {
+    update_context();
+    return nhv_get_key();
+}
 
 static int viper_nh_poskey(coordxy *x, coordxy *y, int *mod) {
     *x = *y = 0;
     *mod = 0;
+    update_context();
     return nhv_get_key();
 }
 
@@ -351,6 +396,15 @@ static int viper_get_ext_cmd(void) {
     menu_item *picked = NULL;
     int n, result = -1;
     char text[BUFSZ];
+
+    /* One the app queued, by name (its command list's "#pray\n") */
+    if (nhv_queued_line(text, sizeof text)) {
+        destroy_nhwindow(w);
+        for (int i = 0; extcmdlist[i].ef_txt; i++)
+            if (!strcmp(extcmdlist[i].ef_txt, text))
+                return i;
+        return -1;
+    }
 
     start_menu(w, MENU_BEHAVE_STANDARD);
     for (int i = 0; extcmdlist[i].ef_txt; i++) {
