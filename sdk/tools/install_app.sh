@@ -10,7 +10,18 @@
 # launch_details.md) if it has them, and the contents of its assets/ folder. A project with several
 # (project_elfs(), e.g. screensavers/) installs each folder with an info.json
 # the same way, as <prefix><project>.<folder>/.
+#
+# The installed info.json gets "min_api": the app's API level, the oldest
+# firmware app API it runs on (check_app_elf.py --api-level). The project's
+# own info.json is left as it is.
 set -e
+
+# check_app_elf.py: beside this script in the app SDK (sdk/tools/), or in the
+# firmware's tree when this is viper's apps/
+here=$(cd "$(dirname "$0")" && pwd)
+checker="$here/check_app_elf.py"
+[ -f "$checker" ] || checker="$here/../components/elf_loader/tool/check_app_elf.py"
+python=${PYTHON:-python3}
 
 app_dir=${1%/}
 apps_root=$2
@@ -30,7 +41,20 @@ install_one() {
         if [ -f "$2/$extra" ]; then cp "$2/$extra" "$dest/"; fi
     done
     if [ -d "$2/assets" ]; then cp -R "$2/assets/." "$dest/"; fi
-    echo "  Installed $3"
+    level=$("$python" "$checker" --api-level "$1")
+    if [ -f "$dest/info.json" ]; then
+        "$python" - "$dest/info.json" "$level" <<'PY'
+import json, sys
+path, level = sys.argv[1], int(sys.argv[2])
+with open(path) as f:
+    manifest = json.load(f)
+manifest["min_api"] = level
+with open(path, "w") as f:
+    json.dump(manifest, f, indent=4)
+    f.write("\n")
+PY
+    fi
+    echo "  Installed $3 (API level $level)"
 }
 
 if grep -q '^project_elfs(' "$app_dir/CMakeLists.txt"; then

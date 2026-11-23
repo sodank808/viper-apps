@@ -25,7 +25,11 @@ Build it with `idf.py elf` under the ESP-IDF version in `VERSION`.
 `wfc` and `drum_synth` have sources as well as headers; an app that uses one
 lists `libs/<lib>/src/*.cpp` in its own `main/CMakeLists.txt`.
 
-Versions: the major version is the app ABI (`VIPER_APP_ABI_VERSION` in
-`viper_app.h`); firmware runs apps whose ABI is in its supported range. Exports
-are only ever added (`exports.lock` lists every one), and firmware refuses an
-app that calls one it doesn't have, with a message naming it.
+Versions: `<ABI>.<API level>.<patch>`. The major version is the app ABI
+(`VIPER_APP_ABI_VERSION` in `viper_app.h`); firmware runs apps whose ABI is in
+its supported range. The minor version is the API level (`VIPER_API_LEVEL`):
+one more each time the firmware exports new functions. Exports are only ever
+added; `exports.lock` lists every one with the level it arrived in. The checker
+reports the level an app needs, `tools/install_app.sh` writes it into the
+installed `info.json` as `"min_api"`, and firmware with a lower level refuses
+the app and says to update Viper.
