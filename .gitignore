@@ -16,3 +16,4 @@ wolf3d/assets/
 
 # NetHack's packed data (nethack/tools/make_nhdat.sh): built from upstream/dat
 nethack/assets/nhdat
+nethack/assets/tiles.bin

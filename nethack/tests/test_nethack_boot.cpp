@@ -7,7 +7,10 @@
 
 #include "boot_test_util.hpp"
 
+#include <cstdint>
 #include <fstream>
+#include <set>
+#include <vector>
 
 #include "app_storage.hpp"
 #include "elf_app.hpp"
@@ -50,8 +53,10 @@ class Installed {
             fs::copy_file(app_folder() / "assets" / f, dir / f,
                           fs::copy_options::overwrite_existing);
         }
-        fs::copy_file(fs::path(VIPER_SIM_NETHACK_DATA) / "nhdat", dir / "nhdat",
-                      fs::copy_options::overwrite_existing);
+        for (const char *f : {"nhdat", "tiles.bin"}) {
+            fs::copy_file(fs::path(VIPER_SIM_NETHACK_DATA) / f, dir / f,
+                          fs::copy_options::overwrite_existing);
+        }
         elf_apps::rescan();
     }
     ~Installed() {
@@ -113,6 +118,30 @@ void close_nethack() {
     run_frames(10);
 }
 
+// Dismisses --More--, text windows and menus until NetHack asks for a command
+void back_to_commands() {
+    REQUIRE(run_until(
+        [] {
+            if (asked() == nethack::Ask::Key) {
+                return true;
+            }
+            if (asked() != nethack::Ask::None) {
+                press(button(B::B));
+            }
+            run_frames(2);
+            return false;
+        },
+        30s));
+}
+
+// For as long as it lives, games start from `seed`: the same game each run
+struct Seeded {
+    explicit Seeded(unsigned long seed) { nethack::engine_set_seed(seed); }
+    ~Seeded() { nethack::engine_set_seed(0); }
+    Seeded(const Seeded &) = delete;
+    Seeded &operator=(const Seeded &) = delete;
+};
+
 } // namespace
 
 TEST_CASE("NetHack starts a game, saves it on closing and restores it", "[boot][apps][nethack]") {
@@ -133,10 +162,8 @@ TEST_CASE("NetHack starts a game, saves it on closing and restores it", "[boot][
     for (B dir : {B::LEFT, B::RIGHT, B::UP, B::DOWN, B::LEFT, B::LEFT, B::RIGHT, B::RIGHT}) {
         press(button(dir));
         run_frames(8);
-        while (asked() == nethack::Ask::More || asked() == nethack::Ask::YesNo) {
-            press(button(B::B));
-            run_frames(4);
-        }
+        // (A random game: whatever the walk brought up)
+        back_to_commands();
     }
     INFO(screen_text());
     CHECK(hero_on_map());
@@ -173,26 +200,13 @@ TEST_CASE("NetHack starts a game, saves it on closing and restores it", "[boot][
     fs::remove_all(data_dir());
 }
 
-// Dismisses --More--, text windows and menus until NetHack asks for a command
-void back_to_commands() {
-    REQUIRE(run_until(
-        [] {
-            if (asked() == nethack::Ask::Key) {
-                return true;
-            }
-            if (asked() != nethack::Ask::None) {
-                press(button(B::B));
-            }
-            run_frames(2);
-            return false;
-        },
-        30s));
-}
-
 TEST_CASE("NetHack's buttons: context action, menus, inventory, positions",
           "[boot][apps][nethack]") {
     boot_to_home();
     Installed app;
+    // The same game each run: what it checks depends on the hero (its first
+    // item must be one it can drop)
+    const Seeded seeded(1);
     fs::remove_all(data_dir());
     open_nethack();
     play_until_command();
@@ -210,7 +224,7 @@ TEST_CASE("NetHack's buttons: context action, menus, inventory, positions",
     CHECK_FALSE(nethack::app_status().game_menu_open);
 
     // Its Options and Help are NetHack's own menus
-    for (int line : {1, 3}) {
+    for (int line : {2, 4}) {
         press(button(B::START));
         run_frames(3);
         for (int i = 0; i < line; i++) {
@@ -222,7 +236,7 @@ TEST_CASE("NetHack's buttons: context action, menus, inventory, positions",
         const nethack::Window *w = model().window(model().request.window);
         REQUIRE(w);
         CHECK(w->items.size() > 5);
-        shot(line == 1 ? "9_options" : "10_help");
+        shot(line == 2 ? "9_options" : "10_help");
         back_to_commands();
     }
 
@@ -294,9 +308,166 @@ TEST_CASE("NetHack's buttons: context action, menus, inventory, positions",
     fs::remove_all(data_dir());
 }
 
+namespace {
+
+// A short press of Select (a long one closes the app)
+void tap_select() {
+    viper_sim::set_gamepad_state(button(B::SELECT));
+    run_frames(3);
+    viper_sim::set_gamepad_state({});
+    run_frames(3);
+}
+
+} // namespace
+
+TEST_CASE("NetHack's views: Select cycles terminal, tiles and small tiles",
+          "[boot][apps][nethack]") {
+    boot_to_home();
+    Installed app;
+    fs::remove_all(data_dir());
+    open_nethack();
+    play_until_command();
+    // Each view draws the map its own way; the game doesn't notice
+    const auto turn = model().status;
+    std::vector<std::vector<uint16_t>> screens;
+    const char *const names[] = {"11_terminal", "12_tiles", "13_small_tiles"};
+    for (int view = 0; view < 3; view++) {
+        CHECK(nethack::app_status().map_view == view);
+        run_frames(2);
+        shot(names[view]);
+        screens.push_back(viper_sim::panel_snapshot().pixels);
+        tap_select();
+    }
+    CHECK(nethack::app_status().map_view == 0); // round to the terminal
+    // The game menu's first line is the next view too
+    press(button(B::START));
+    run_frames(3);
+    press(button(B::A));
+    run_frames(3);
+    CHECK(nethack::app_status().map_view == 1);
+    CHECK_FALSE(nethack::app_status().game_menu_open);
+    tap_select();
+    tap_select();
+    REQUIRE(nethack::app_status().map_view == 0);
+    CHECK(screens[0] != screens[1]);
+    CHECK(screens[1] != screens[2]);
+    CHECK(model().status == turn);
+    CHECK(app_running());
+
+    // The view is kept: the app opens in the one chosen last
+    tap_select();
+    REQUIRE(nethack::app_status().map_view == 1);
+    close_nethack();
+    open_nethack();
+    play_until_command();
+    CHECK(nethack::app_status().map_view == 1);
+    tap_select();
+    tap_select(); // back to the terminal, for the tests after this one
+    CHECK(nethack::app_status().map_view == 0);
+    close_nethack();
+    fs::remove_all(data_dir());
+}
+
+namespace {
+
+// The game's state as the model has it: the map, where the hero is, the
+// status lines and the messages (FNV-1a)
+uint64_t state_hash() {
+    uint64_t h = 1469598103934665603ull;
+    const auto mix = [&h](uint64_t v) {
+        for (int i = 0; i < 8; i++) {
+            h = (h ^ ((v >> (i * 8)) & 0xFF)) * 1099511628211ull;
+        }
+    };
+    const auto &m = model();
+    for (const auto &c : m.map) {
+        mix(static_cast<uint64_t>(c.glyph) ^ (static_cast<uint64_t>(c.flags) << 32));
+    }
+    mix(static_cast<uint64_t>(m.hero_x) | (static_cast<uint64_t>(m.hero_y) << 32));
+    for (const auto &line : m.status) {
+        for (char ch : line) {
+            mix(static_cast<unsigned char>(ch));
+        }
+    }
+    for (const auto &line : m.messages) {
+        for (char ch : line) {
+            mix(static_cast<unsigned char>(ch));
+        }
+    }
+    return h;
+}
+
+// A new game from `seed`, played by the same buttons each time; the state
+// after each turn. With switch_views, Select is tapped after every turn.
+std::vector<uint64_t> scripted_game(unsigned long seed, bool switch_views) {
+    fs::remove_all(data_dir());
+    nethack::engine_set_seed(seed);
+    open_nethack();
+    play_until_command();
+    std::vector<uint64_t> states{state_hash()};
+    const B moves[] = {B::LEFT,  B::LEFT, B::UP,   B::RIGHT, B::DOWN, B::DOWN, B::RIGHT, B::RIGHT,
+                       B::RIGHT, B::UP,   B::LEFT, B::DOWN,  B::LEFT, B::UP,   B::RIGHT, B::DOWN};
+    for (int round = 0; round < 2; round++) {
+        for (B dir : moves) {
+            press(button(dir));
+            run_frames(8);
+            // Whatever it asks, the same answer each time
+            REQUIRE(run_until(
+                [] {
+                    if (asked() == nethack::Ask::Key) {
+                        return true;
+                    }
+                    if (asked() == nethack::Ask::More || asked() == nethack::Ask::Text) {
+                        press(button(B::A));
+                    } else if (asked() != nethack::Ask::None) {
+                        press(button(B::B));
+                    }
+                    run_frames(2);
+                    return false;
+                },
+                30s));
+            if (switch_views) {
+                tap_select();
+            }
+            states.push_back(state_hash());
+        }
+    }
+    close_nethack();
+    // Back to the terminal view, as the tests found it
+    while (switch_views && nethack::app_status().map_view != 0) {
+        open_nethack();
+        tap_select();
+        close_nethack();
+    }
+    nethack::engine_set_seed(0);
+    fs::remove_all(data_dir());
+    return states;
+}
+
+} // namespace
+
+TEST_CASE("NetHack's views only draw: switching every turn plays the same game",
+          "[boot][apps][nethack]") {
+    boot_to_home();
+    Installed app;
+    const auto plain = scripted_game(4242, false);
+    const auto switching = scripted_game(4242, true);
+    REQUIRE(plain.size() == switching.size());
+    // The game moved on: most turns changed something
+    CHECK(std::set<uint64_t>(plain.begin(), plain.end()).size() > plain.size() / 2);
+    for (size_t i = 0; i < plain.size(); i++) {
+        INFO("turn " << i);
+        CHECK(plain[i] == switching[i]);
+    }
+    // And the seed is what made them the same: another plays another game
+    CHECK(scripted_game(777, false).back() != plain.back());
+}
+
 TEST_CASE("NetHack types a line on the system keyboard", "[boot][apps][nethack]") {
     boot_to_home();
     Installed app;
+    // The same game each run (a random one may not let the hero write here)
+    const Seeded seeded(1);
     fs::remove_all(data_dir());
     open_nethack();
     play_until_command();

@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "gfx/font_unscii8.hpp"
+#include "nethack_tiles.hpp"
 
 namespace nethack {
 namespace {
@@ -168,6 +169,71 @@ void draw_map(gfx::Surface &s, const Model &m, const Layout &l) {
                           kCell + 4, kCell + 4};
         s.frame(r, kAccent);
         s.frame({r.x + 1, r.y + 1, r.w - 2, r.h - 2}, kBright);
+    }
+}
+
+// The pets' mark in the tile views (the tiles don't show which are tame)
+void draw_heart(gfx::Surface &s, int x, int y) {
+    static const char *const kHeart[] = {".x.x.", "xxxxx", ".xxx.", "..x.."};
+    for (int r = 0; r < 4; r++) {
+        for (int c = 0; c < 5; c++) {
+            if (kHeart[r][c] == 'x') {
+                s.set(x + c, y + r, gfx::rgb(255, 60, 90));
+            }
+        }
+    }
+}
+
+// The map in NetHack's tiles, 16 or 8 pixels a cell, scrolled to keep the
+// hero (or the cursor, choosing a position) in the middle where it can be
+void draw_tiles(gfx::Surface &s, const Model &m, const Layout &l, TileSet &tiles, bool small) {
+    const int size = small ? TileSet::kSmall : TileSet::kSize;
+    const int area_h = l.status_y - 2 - l.map_y;
+    const int cols = std::min(s.w / size, kCols - 1);
+    const int rows = std::min(area_h / size, kRows);
+    const int fx = m.getpos ? m.cursor_x : m.hero_x;
+    const int fy = m.getpos ? m.cursor_y : m.hero_y;
+    const int x0 = std::clamp(fx - cols / 2, 1, std::max(1, kCols - cols));
+    const int y0 = std::clamp(fy - rows / 2, 0, std::max(0, kRows - rows));
+    const int left = (s.w - cols * size) / 2;
+    const int top = l.map_y + (area_h - rows * size) / 2;
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            const Cell &cell = m.cell(x0 + c, y0 + r);
+            const gfx::Pixel *px = tiles.tile(cell.tile, small);
+            if (!px) {
+                continue;
+            }
+            const int x = left + c * size, y = top + r * size;
+            const bool dim = (cell.flags & NHV_CELL_REMEMBERED) != 0;
+            for (int ty = 0; ty < size; ty++) {
+                gfx::Pixel *out = s.row(y + ty) + x;
+                const gfx::Pixel *in = px + ty * size;
+                for (int tx = 0; tx < size; tx++) {
+                    out[tx] = dim ? dimmed(in[tx]) : in[tx];
+                }
+            }
+            if ((cell.flags & NHV_CELL_PET) && !small) {
+                draw_heart(s, x + 1, y + 1);
+            }
+        }
+    }
+    const auto outline = [&](int cx, int cy, gfx::Pixel a, gfx::Pixel b) {
+        if (cx < x0 || cx >= x0 + cols || cy < y0 || cy >= y0 + rows) {
+            return;
+        }
+        const gfx::Rect rc{left + (cx - x0) * size - 1, top + (cy - y0) * size - 1, size + 2,
+                           size + 2};
+        s.frame(rc, a);
+        if (b != a) {
+            s.frame({rc.x - 1, rc.y - 1, rc.w + 2, rc.h + 2}, b);
+        }
+    };
+    if (!small) {
+        outline(m.hero_x, m.hero_y, gfx::rgb(120, 120, 60), gfx::rgb(120, 120, 60));
+    }
+    if (m.getpos) {
+        outline(m.cursor_x, m.cursor_y, kBright, kAccent);
     }
 }
 
@@ -353,7 +419,11 @@ void draw(gfx::Surface &s, const Model &m, const ViewState &v) {
     default:
         break;
     }
-    draw_map(s, m, l);
+    if (v.map_view != MapView::Terminal && v.tiles && v.tiles->is_open()) {
+        draw_tiles(s, m, l, *v.tiles, v.map_view == MapView::SmallTiles);
+    } else {
+        draw_map(s, m, l);
+    }
     draw_messages(s, m, l);
     draw_status(s, m, l);
     switch (m.request.ask) {

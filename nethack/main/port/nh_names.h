@@ -62,6 +62,9 @@
 #define Strlen_ nh_Strlen_
 #define The nh_The
 #define There nh_There
+#define Tile_corr nh_Tile_corr
+#define Tile_stone nh_Tile_stone
+#define Tile_unexplored nh_Tile_unexplored
 #define Tobjnam nh_Tobjnam
 #define WIN_INVEN nh_WIN_INVEN
 #define WIN_MAP nh_WIN_MAP
@@ -2098,6 +2101,9 @@
 #define max_passive_dmg nh_max_passive_dmg
 #define max_rank_sz nh_max_rank_sz
 #define maxledgerno nh_maxledgerno
+#define maxmontile nh_maxmontile
+#define maxobjtile nh_maxobjtile
+#define maxothtile nh_maxothtile
 #define may_dig nh_may_dig
 #define may_passwall nh_may_passwall
 #define maybe_absorb_item nh_maybe_absorb_item
@@ -3483,6 +3489,7 @@
 #define toggle_displacement nh_toggle_displacement
 #define topologize nh_topologize
 #define topten nh_topten
+#define total_tiles_used nh_total_tiles_used
 #define touch_artifact nh_touch_artifact
 #define touch_of_death nh_touch_of_death
 #define tp_sensemon nh_tp_sensemon

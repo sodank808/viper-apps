@@ -48,6 +48,10 @@ void engine_answer_continue(); // Text, More
 // without waiting (a command from the command list, "20s")
 void engine_queue_keys(const std::string &keys);
 
+// For tests: the games started from now on start from this seed, so the
+// same buttons play the same game; 0 (the default) for a new seed each game
+void engine_set_seed(unsigned long seed);
+
 // Memory NetHack holds now, and the most it has held this game
 size_t engine_heap_used();
 size_t engine_heap_peak();

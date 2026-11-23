@@ -25,6 +25,7 @@ struct Cell {
     char ch = ' ';
     uint8_t color = 0; // NetHack's CLR_* (0..15)
     uint8_t flags = 0; // NHV_CELL_*
+    int16_t tile = -1; // its tile in tiles.bin, -1 for none (dark, unexplored)
 };
 
 struct MenuItem {

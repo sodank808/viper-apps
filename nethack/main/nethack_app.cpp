@@ -7,7 +7,8 @@
 // what's obvious where the hero is (stairs, picking up, opening a door; else
 // searching), B is Escape, X the inventory (choose an item for what to do with
 // it), Y the command list, L and R go up and down stairs, Start the game menu
-// (options, help, extended commands, save). While a position is chosen
+// (options, help, extended commands, save), and a short press of Select the
+// next view (terminal, tiles, small tiles). While a position is chosen
 // (travel, far look), the d-pad moves a cursor and A picks.
 
 #include <sys/stat.h>
@@ -19,6 +20,7 @@
 #include "gfx/surface.hpp"
 #include "nethack_app.h"
 #include "nethack_engine.hpp"
+#include "nethack_tiles.hpp"
 #include "nethack_view.hpp"
 #include "viper_app.h"
 
@@ -40,6 +42,12 @@ constexpr uint32_t kDiagonalMs = 70;
 // A direction held this long repeats, this often
 constexpr uint32_t kRepeatDelayMs = 350;
 constexpr uint32_t kRepeatMs = 110;
+
+// Select let go sooner than this is the next view; held 0.8 s, the OS
+// closes the app
+constexpr uint32_t kSelectTapMs = 500;
+// The view chosen last, in the app's preferences
+constexpr const char *kViewPref = "view";
 
 // The hero: its save is found by this name
 constexpr const char *kHeroName = "Viper";
@@ -92,11 +100,15 @@ constexpr int kCommandCount = sizeof(kCommands) / sizeof(kCommands[0]);
 // The commands used last come first in the list, this many
 constexpr size_t kRecentCommands = 4;
 
-// The game menu (Start)
+// The game menu (Start); a line without keys is the app's own
 constexpr Command kGameMenu[] = {
-    {"Extended command (#)", "#"}, {"Options", "O"},
-    {"Autopickup on/off", "@"},    {"Help", "?"},
-    {"Discoveries", "\\"},         {"Overview of the dungeon", "\x0f"},
+    {"Next view (Select)", ""},
+    {"Extended command (#)", "#"},
+    {"Options", "O"},
+    {"Autopickup on/off", "@"},
+    {"Help", "?"},
+    {"Discoveries", "\\"},
+    {"Overview of the dungeon", "\x0f"},
     {"Save and quit", "S"},
 };
 constexpr int kGameMenuCount = sizeof(kGameMenu) / sizeof(kGameMenu[0]);
@@ -140,9 +152,18 @@ struct App {
 
     // The system keyboard, open for a line of text (Ask::Line)
     bool typing = false;
+
+    // The map's view, and the tiles for the tile views (opened when first
+    // needed)
+    MapView map_view = MapView::Terminal;
+    TileSet tiles;
+    std::string app_dir;
+    uint32_t select_down = 0; // when Select went down (0: it's up)
 };
 
 App *a = nullptr;
+
+void next_view();
 
 bool file_exists(const std::string &path) {
     struct stat st;
@@ -357,7 +378,12 @@ void input_list(const viper_input_t *now, const viper_input_t *previous) {
     a->list = List::None;
     a->dirty = true;
     if (list == List::Game) {
-        send_keys(kGameMenu[a->command_cursor].keys);
+        const char *keys = kGameMenu[a->command_cursor].keys;
+        if (*keys) {
+            send_keys(keys);
+        } else {
+            next_view();
+        }
         return;
     }
     const int command = command_order()[a->command_cursor];
@@ -652,15 +678,62 @@ void draw_frame() {
         } else {
             a->view.hints = std::string("A:") + context_action(m).label + " X:items Y:cmds St:menu";
         }
+        a->view.map_view = a->map_view;
+        a->view.tiles = &a->tiles;
         draw(s, m, a->view);
     }
     viper_frame_end(1);
     a->frames++;
 }
 
+// Switches to a view; a tile view only if the tiles open
+void set_view(MapView view) {
+    if (view != MapView::Terminal && !a->tiles.is_open() &&
+        !a->tiles.open(a->app_dir + "/tiles.bin")) {
+        viper_log("nethack: no tiles (%s/tiles.bin); the terminal view only", a->app_dir.c_str());
+        view = MapView::Terminal;
+    }
+    a->map_view = view;
+    a->dirty = true;
+}
+
+void next_view() {
+    switch (a->map_view) {
+    case MapView::Terminal:
+        set_view(MapView::Tiles);
+        break;
+    case MapView::Tiles:
+        set_view(MapView::SmallTiles);
+        break;
+    case MapView::SmallTiles:
+        set_view(MapView::Terminal);
+        break;
+    }
+    viper_prefs_set_int(kViewPref, static_cast<int32_t>(a->map_view));
+}
+
+// Select: a short press is the next view (a long one closes the app)
+void input_select(const viper_input_t *now, const viper_input_t *previous) {
+    const bool down = now->buttons & VIPER_BUTTON_SELECT;
+    const bool was = previous->buttons & VIPER_BUTTON_SELECT;
+    if (down && !was) {
+        a->select_down = now->now_ms ? now->now_ms : 1;
+    } else if (!down && was && a->select_down) {
+        if (now->now_ms - a->select_down < kSelectTapMs) {
+            next_view();
+        }
+        a->select_down = 0;
+    }
+}
+
 void create(void *) {
     a = new App;
     const std::string app_dir = viper_app_path() ? viper_app_path() : ".";
+    a->app_dir = app_dir;
+    int32_t view = 0;
+    if (viper_prefs_get_int(kViewPref, &view) && view > 0 && view <= 2) {
+        set_view(static_cast<MapView>(view));
+    }
     const char *data = viper_data_path();
     if (!data || !*data) {
         show_message("NETHACK\n\nThere's nowhere to keep the game:\nno SD card or fatfs.");
@@ -699,6 +772,7 @@ uint32_t loop(const viper_input_t *now, const viper_input_t *previous) {
         return 30;
     }
 
+    input_select(now, previous);
     bool waiting = engine_run(kFrameWaitMs);
     if (engine_finished()) {
         if (engine_error().empty()) {
@@ -749,6 +823,7 @@ nethack::AppStatus nethack::app_status() {
     s.message = a->state == State::Message ? a->message : std::string();
     s.commands_open = a->list == List::Commands;
     s.game_menu_open = a->list == List::Game;
+    s.map_view = static_cast<int>(a->map_view);
     s.frames = a->frames;
     return s;
 }

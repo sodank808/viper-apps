@@ -23,6 +23,9 @@
 #define NOSUSPEND
 #define NO_SIGNAL
 #define NOCRASHREPORT
+/* Each glyph's tile in glyphmap[] (src/tile.c, tools/make_tile_c.sh), for
+   the tile views */
+#define TILES_IN_GLYPHMAP
 
 #ifndef NH_HOST_TOOL
 #include "nh_sim.h"

@@ -94,6 +94,7 @@ struct Engine {
 };
 
 Engine *g = nullptr;
+unsigned long fixed_seed = 0; // engine_set_seed()
 
 #ifdef NH_RESTART_STATE
 std::vector<char> g_initial_data;
@@ -323,6 +324,8 @@ void engine_answer_menu(const std::vector<int> &indexes, bool cancel) {
 
 void engine_answer_continue() { give_turn(); }
 
+void engine_set_seed(unsigned long seed) { fixed_seed = seed; }
+
 void engine_queue_keys(const std::string &keys) {
     if (g) {
         g->queued += keys;
@@ -343,7 +346,7 @@ extern "C" {
 
 void nhv_map_clear(void) { g->model.clear_map(); }
 
-void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags) {
+void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, int tile) {
     if (x < 0 || x >= nethack::kCols || y < 0 || y >= nethack::kRows) {
         return;
     }
@@ -352,6 +355,7 @@ void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags) {
     c.ch = static_cast<char>(ch >= 32 && ch < 127 ? ch : '?');
     c.color = static_cast<uint8_t>(color & 15);
     c.flags = static_cast<uint8_t>(flags);
+    c.tile = static_cast<int16_t>(tile);
     g->model.changes++;
 }
 
@@ -569,6 +573,8 @@ void nhv_exit(int status) {
     }
     longjmp(g->exit_jump, 1);
 }
+
+unsigned long nhv_random_seed(void) { return nethack::fixed_seed; }
 
 void nhv_log(const char *text) {
     g->last_log = text;
