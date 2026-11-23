@@ -26,6 +26,8 @@ struct Cell {
     uint8_t color = 0; // NetHack's CLR_* (0..15)
     uint8_t flags = 0; // NHV_CELL_*
     int16_t tile = -1; // its tile in tiles.bin, -1 for none (dark, unexplored)
+    uint8_t terrain = 0;       // NHV_TERRAIN_*: the ground, under what's shown
+    int16_t terrain_tile = -1; // the ground's tile, -1 for none
 };
 
 struct MenuItem {

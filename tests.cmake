@@ -39,8 +39,10 @@ target_compile_definitions(viper_sim_app_boot_tests PRIVATE
 target_include_directories(viper_sim_boot_deps INTERFACE ${VIPER_PUBLIC_APPS}/nethack/main)
 target_sources(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/tests/test_nethack_model.cpp
     ${VIPER_PUBLIC_APPS}/nethack/main/nethack_view.cpp
-    ${VIPER_PUBLIC_APPS}/nethack/main/nethack_tiles.cpp)
+    ${VIPER_PUBLIC_APPS}/nethack/main/nethack_tiles.cpp
+    ${VIPER_PUBLIC_APPS}/nethack/main/nethack_first_person.cpp)
 add_dependencies(viper_sim_app_tests nethack_sim_data)
 target_compile_definitions(viper_sim_app_tests PRIVATE
     VIPER_SIM_NETHACK_DATA="${NETHACK_SIM_DATA}")
-target_include_directories(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/main)
+target_include_directories(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/main
+    ${VIPER_ROOT}/components/raycast/include)

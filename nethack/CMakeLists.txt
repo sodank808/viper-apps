@@ -10,6 +10,6 @@ include(../sdk/viper_sdk.cmake)
 
 # The shared game libraries this app uses (components/gfx: the terminal
 # view); the simulator reads this line too
-set(VIPER_LIBS gfx)
+set(VIPER_LIBS gfx raycast)
 
 project_elf(nethack)

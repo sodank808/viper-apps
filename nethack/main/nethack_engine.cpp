@@ -346,7 +346,8 @@ extern "C" {
 
 void nhv_map_clear(void) { g->model.clear_map(); }
 
-void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, int tile) {
+void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, int tile,
+                   int terrain, int terrain_tile) {
     if (x < 0 || x >= nethack::kCols || y < 0 || y >= nethack::kRows) {
         return;
     }
@@ -356,6 +357,8 @@ void nhv_map_glyph(int x, int y, int glyph, int ch, int color, unsigned flags, i
     c.color = static_cast<uint8_t>(color & 15);
     c.flags = static_cast<uint8_t>(flags);
     c.tile = static_cast<int16_t>(tile);
+    c.terrain = static_cast<uint8_t>(terrain);
+    c.terrain_tile = static_cast<int16_t>(terrain_tile);
     g->model.changes++;
 }
 
