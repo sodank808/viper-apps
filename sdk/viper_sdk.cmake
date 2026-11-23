@@ -83,7 +83,7 @@ macro(_viper_elf_setup)
     # src/*.cpp in its own SRCS (apps/screensavers/circuit/CMakeLists.txt,
     # apps/drum_machine/main/CMakeLists.txt), and the sim links the firmware's
     # copy.
-    set(viper_known_libs gfx game sfx espgl wfc drum_synth)
+    set(viper_known_libs gfx game sfx espgl wfc drum_synth raycast)
     foreach(lib IN LISTS VIPER_LIBS)
         if(NOT lib IN_LIST viper_known_libs)
             message(FATAL_ERROR "VIPER_LIBS: unknown library '${lib}' (known: ${viper_known_libs})")
