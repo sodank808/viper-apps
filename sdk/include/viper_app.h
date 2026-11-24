@@ -44,6 +44,7 @@
  * firmware is the older one (components/system/include/elf_app_abi.hpp).
  */
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -52,13 +53,13 @@
 extern "C" {
 #endif
 
-#define VIPER_APP_MAGIC         0x50504156u  /* "VAPP" */
+#define VIPER_APP_MAGIC 0x50504156u /* "VAPP" */
 /* The version apps built with this header declare, and the newest the firmware
  * built with it runs. 2: loop() gets viper_input_t */
-#define VIPER_APP_ABI_VERSION      2u
+#define VIPER_APP_ABI_VERSION 2u
 /* The oldest version the firmware built with this header still runs. Version 1
  * (loop() got viper_gamepad_t) isn't run any more. */
-#define VIPER_APP_ABI_MIN_VERSION  2u
+#define VIPER_APP_ABI_MIN_VERSION 2u
 
 /* The app API level: one more each time the firmware exports new functions.
  * Apps built with this header can call the functions of every level up to it;
@@ -67,26 +68,26 @@ extern "C" {
  * arrived in, check_app_elf.py reports the level an app needs, and its
  * installed info.json says so as "min_api". viper_api_level() is the running
  * firmware's. Written by check_exports_lock.py --update; don't edit. */
-#define VIPER_API_LEVEL 4
+#define VIPER_API_LEVEL 6
 
 typedef enum {
-    VIPER_RENDER_LVGL = 0,        /* build an LVGL UI under the container */
-    VIPER_RENDER_VIDEO_BLIT = 1,  /* draw to the framebuffer (viper_frame_begin()) */
+    VIPER_RENDER_LVGL = 0,       /* build an LVGL UI under the container */
+    VIPER_RENDER_VIDEO_BLIT = 1, /* draw to the framebuffer (viper_frame_begin()) */
 } viper_render_engine_t;
 
 /* Buttons, as bits of viper_input_t.buttons */
-#define VIPER_BUTTON_A          (1u << 0)
-#define VIPER_BUTTON_B          (1u << 1)
-#define VIPER_BUTTON_X          (1u << 2)
-#define VIPER_BUTTON_Y          (1u << 3)
-#define VIPER_BUTTON_SELECT     (1u << 4)
-#define VIPER_BUTTON_START      (1u << 5)
-#define VIPER_BUTTON_UP         (1u << 6)
-#define VIPER_BUTTON_DOWN       (1u << 7)
-#define VIPER_BUTTON_LEFT       (1u << 8)
-#define VIPER_BUTTON_RIGHT      (1u << 9)
-#define VIPER_BUTTON_L          (1u << 10)
-#define VIPER_BUTTON_R          (1u << 11)
+#define VIPER_BUTTON_A (1u << 0)
+#define VIPER_BUTTON_B (1u << 1)
+#define VIPER_BUTTON_X (1u << 2)
+#define VIPER_BUTTON_Y (1u << 3)
+#define VIPER_BUTTON_SELECT (1u << 4)
+#define VIPER_BUTTON_START (1u << 5)
+#define VIPER_BUTTON_UP (1u << 6)
+#define VIPER_BUTTON_DOWN (1u << 7)
+#define VIPER_BUTTON_LEFT (1u << 8)
+#define VIPER_BUTTON_RIGHT (1u << 9)
+#define VIPER_BUTTON_L (1u << 10)
+#define VIPER_BUTTON_R (1u << 11)
 
 /* What loop() gets each frame: the input, and the time.
  *
@@ -96,37 +97,35 @@ typedef enum {
  * gets 0 from older firmware. */
 typedef struct {
     uint32_t size;
-    uint32_t buttons;     /* VIPER_BUTTON_* bits that are down */
-    int16_t touch_x;      /* where the touchscreen is touched, in screen */
-    int16_t touch_y;      /* pixels; the last point while touch_down is 0 */
-    uint8_t touch_down;   /* 1 while touched; always 0 without a touchscreen */
+    uint32_t buttons;   /* VIPER_BUTTON_* bits that are down */
+    int16_t touch_x;    /* where the touchscreen is touched, in screen */
+    int16_t touch_y;    /* pixels; the last point while touch_down is 0 */
+    uint8_t touch_down; /* 1 while touched; always 0 without a touchscreen */
     uint8_t reserved_[3];
-    uint32_t now_ms;      /* ms since the device started (wraps after 49 days) */
-    uint32_t dt_ms;       /* ms since the last loop(): 0 for the first after
-                           * create() or resume(), so time spent paused or
-                           * loading doesn't count */
+    uint32_t now_ms; /* ms since the device started (wraps after 49 days) */
+    uint32_t dt_ms;  /* ms since the last loop(): 0 for the first after
+                      * create() or resume(), so time spent paused or
+                      * loading doesn't count */
 } viper_input_t;
 
-#define VIPER_INPUT_HAS(input, field) \
+#define VIPER_INPUT_HAS(input, field)                                                              \
     ((input)->size >= offsetof(viper_input_t, field) + sizeof((input)->field))
 
 /* Just pressed: down now, up in the previous frame */
 static inline int viper_button_pressed(const viper_input_t *now, const viper_input_t *previous,
-                                       uint32_t button)
-{
+                                       uint32_t button) {
     return (now->buttons & button) && !(previous->buttons & button);
 }
 
 /* Just touched: touching now, not in the previous frame */
-static inline int viper_touch_began(const viper_input_t *now, const viper_input_t *previous)
-{
+static inline int viper_touch_began(const viper_input_t *now, const viper_input_t *previous) {
     return now->touch_down && !previous->touch_down;
 }
 
 typedef struct {
-    uint32_t magic;          /* VIPER_APP_MAGIC */
-    uint32_t abi_version;    /* VIPER_APP_ABI_VERSION the app was built with */
-    uint32_t render_engine;  /* viper_render_engine_t */
+    uint32_t magic;         /* VIPER_APP_MAGIC */
+    uint32_t abi_version;   /* VIPER_APP_ABI_VERSION the app was built with */
+    uint32_t render_engine; /* viper_render_engine_t */
 
     /* Every callback may be NULL. */
 
@@ -190,24 +189,24 @@ uint32_t viper_random(void);
  * Does nothing when haptics are off in Settings, on a board without a motor,
  * or for an effect outside 1-123. Returns at once; a new effect replaces one
  * still playing. */
-#define VIPER_HAPTIC_STRONG_CLICK       1
-#define VIPER_HAPTIC_SHARP_CLICK        4
-#define VIPER_HAPTIC_SOFT_BUMP          7
-#define VIPER_HAPTIC_DOUBLE_CLICK       10
-#define VIPER_HAPTIC_TRIPLE_CLICK       12
-#define VIPER_HAPTIC_SOFT_FUZZ          13
-#define VIPER_HAPTIC_STRONG_BUZZ        14
-#define VIPER_HAPTIC_ALERT_750MS        15
-#define VIPER_HAPTIC_ALERT_1000MS       16
-#define VIPER_HAPTIC_BUZZ1              47
-#define VIPER_HAPTIC_BUZZ2              48
-#define VIPER_HAPTIC_BUZZ3              49
-#define VIPER_HAPTIC_BUZZ4              50
-#define VIPER_HAPTIC_BUZZ5              51
-#define VIPER_HAPTIC_PULSING_STRONG_1   52
-#define VIPER_HAPTIC_PULSING_STRONG_2   53
+#define VIPER_HAPTIC_STRONG_CLICK 1
+#define VIPER_HAPTIC_SHARP_CLICK 4
+#define VIPER_HAPTIC_SOFT_BUMP 7
+#define VIPER_HAPTIC_DOUBLE_CLICK 10
+#define VIPER_HAPTIC_TRIPLE_CLICK 12
+#define VIPER_HAPTIC_SOFT_FUZZ 13
+#define VIPER_HAPTIC_STRONG_BUZZ 14
+#define VIPER_HAPTIC_ALERT_750MS 15
+#define VIPER_HAPTIC_ALERT_1000MS 16
+#define VIPER_HAPTIC_BUZZ1 47
+#define VIPER_HAPTIC_BUZZ2 48
+#define VIPER_HAPTIC_BUZZ3 49
+#define VIPER_HAPTIC_BUZZ4 50
+#define VIPER_HAPTIC_BUZZ5 51
+#define VIPER_HAPTIC_PULSING_STRONG_1 52
+#define VIPER_HAPTIC_PULSING_STRONG_2 53
 #define VIPER_HAPTIC_TRANSITION_CLICK_1 58
-#define VIPER_HAPTIC_TRANSITION_HUM_1   64
+#define VIPER_HAPTIC_TRANSITION_HUM_1 64
 void viper_haptic(uint8_t effect);
 
 /* The IMU, on boards that have one: viper_imu_available() says so. Without
@@ -241,7 +240,7 @@ void viper_app_keep_awake(int on);
  * heap, VIPER_MEMORY_INTERNAL (the chip's own RAM) or VIPER_MEMORY_PSRAM, and
  * returns false (and zeros) for one the device doesn't have. */
 #define VIPER_MEMORY_INTERNAL 0u
-#define VIPER_MEMORY_PSRAM    1u
+#define VIPER_MEMORY_PSRAM 1u
 int viper_battery_level(void);
 bool viper_battery_charging(void);
 bool viper_memory(uint32_t heap, uint32_t *free_bytes, uint32_t *total_bytes);
@@ -276,6 +275,48 @@ typedef void (*viper_audio_tap_fn)(int16_t *samples, uint32_t frames, void *user
 bool viper_audio_tap_install(viper_audio_tap_fn fn, void *user);
 void viper_audio_tap_remove(void);
 uint32_t viper_audio_sample_rate(void);
+
+/* Sound for emulators and other apps that make it a frame at a time, at a
+ * rate of their own: the firmware queues it and plays it at the output's
+ * rate, and paces it so the speaker never runs dry. At full speed it's
+ * played as made, resampled by a hair; when the app runs slow (frames come
+ * late, or unevenly with frame skip), it's time-stretched, keeping its pitch,
+ * so music plays slower instead of in bursts with silence between. It's the
+ * firmware's built-in emulators' pacing (emu_audio_stretch.hpp).
+ *
+ * viper_audio_stream_open(rate, channels): `rate` samples a second
+ * (4000-96000), 1 (mono) or 2 (stereo, left first) channels. False for others
+ * or on a board without sound. Opening again changes the rate (a PAL game
+ * switching, say) and starts the queue afresh.
+ * viper_audio_stream_frame(samples, frames): one frame of the app's sound,
+ * `frames` frames of `channels` 16-bit samples, as it was made. Call it once
+ * an emulated frame, skipped ones included; the firmware times them itself.
+ * viper_audio_stream_stretch() is how much it's stretching (1: not at all),
+ * for a status line. viper_audio_stream_close() stops it; closing the app
+ * does too. The stream plays beside an audio tap, which an app can still
+ * have. New in API level 5. */
+bool viper_audio_stream_open(uint32_t rate, uint32_t channels);
+void viper_audio_stream_frame(const int16_t *samples, uint32_t frames);
+float viper_audio_stream_stretch(void);
+void viper_audio_stream_close(void);
+
+/* A thread for work that runs beside loop(), such as an emulator's sound
+ * chips on the other core: pthread_create(), with a name (up to 15
+ * characters, shown in the diagnostic harness's task list and profiles), the
+ * core it runs on (0 or 1, or -1 for either) and a priority:
+ * VIPER_THREAD_PRIORITY_LOW for background work, above only the idle tasks
+ * (what pthread_create() gives), or VIPER_THREAD_PRIORITY_HIGH for work a
+ * frame waits on: on core 1 it shares the sound output task's priority and
+ * runs ahead of the display's video task, so don't spin there for long (sleep
+ * when there's nothing to do). loop() runs on core 0, so a thread on core 1
+ * runs beside it.
+ * `stack_size` is in bytes (at least 2048). Returns 0, or an errno value as
+ * pthread_create() does. Join it with pthread_join() before destroy() returns.
+ * In the host simulator it's a plain thread. New in API level 6. */
+#define VIPER_THREAD_PRIORITY_LOW 0
+#define VIPER_THREAD_PRIORITY_HIGH 1
+int viper_thread_create(pthread_t *thread, const char *name, int core, int priority,
+                        size_t stack_size, void *(*fn)(void *), void *arg);
 
 /* Settings the app keeps between launches: options, high scores, small state
  * (docs/design/app_storage.md). They're kept in the app_nvs partition under
@@ -371,6 +412,17 @@ void viper_frame_end(int flush_all);
  * larger than the screen. */
 bool viper_frame_set_indexed(uint32_t width, uint32_t height, const uint16_t *palette);
 
+/* For indexed frames that are drawn whole each time (every pixel, every
+ * frame), as an emulator's are: viper_frame_set_swap(1) has two buffers take
+ * turns, the app drawing one while the display sends the other, instead of
+ * viper_frame_end() copying each frame for the display (70 KB at 320x224,
+ * about 4 ms on an S3). viper_frame_begin()'s buffer then holds the frame
+ * before last, not the last, so draw all of it. Call it after
+ * viper_frame_set_indexed(); going back to RGB565
+ * (viper_frame_set_indexed(0, 0, NULL)) turns it off. False, and nothing
+ * changes, outside an indexed frame. New in API level 6. */
+bool viper_frame_set_swap(int on);
+
 /* The system keyboard, for a line of text: a name, a save's title, a wish.
  * New in API level 4.
  *
@@ -404,8 +456,8 @@ bool viper_text_entry_open(const viper_text_entry_t *config);
 int viper_text_entry_poll(char *buf, size_t size);
 
 /* A pixel from 8-bit red, green and blue */
-#define VIPER_RGB565(r, g, b) \
-    ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | (((b) & 0xFF) >> 3)))
+#define VIPER_RGB565(r, g, b)                                                                      \
+    ((uint16_t)((((r)&0xF8) << 8) | (((g)&0xFC) << 3) | (((b)&0xFF) >> 3)))
 
 /* Makes app_main() return the app's descriptor. Use it once, in one file.
  *
@@ -424,21 +476,23 @@ int viper_text_entry_poll(char *buf, size_t size);
 #ifdef VIPER_APP_STATIC_NAME
 #define VIPER_APP_CONCAT_(a, b) a##b
 #define VIPER_APP_CONCAT(a, b) VIPER_APP_CONCAT_(a, b)
-#define VIPER_APP(descriptor) \
-    VIPER_APP_EXTERN_C const viper_app_t *VIPER_APP_CONCAT(viper_app_, VIPER_APP_STATIC_NAME)(void) \
-    { return &(descriptor); }
+#define VIPER_APP(descriptor)                                                                      \
+    VIPER_APP_EXTERN_C const viper_app_t *VIPER_APP_CONCAT(viper_app_,                             \
+                                                           VIPER_APP_STATIC_NAME)(void) {          \
+        return &(descriptor);                                                                      \
+    }
 #elif defined(__cplusplus)
 /* C++ apps also define __dso_handle, which the C runtime's startup files
  * normally provide and apps don't link: the compiler passes it to
  * __cxa_atexit() when a global with a destructor is constructed, and the
  * firmware runs those destructors when the app is unloaded. GCC declares
  * __dso_handle itself, so it's defined under another name. */
-#define VIPER_APP(descriptor) \
-    __attribute__((visibility("hidden"))) void *viper_app_dso_handle_ __asm__("__dso_handle") = \
-        &viper_app_dso_handle_; \
+#define VIPER_APP(descriptor)                                                                      \
+    __attribute__((visibility("hidden"))) void *viper_app_dso_handle_ __asm__("__dso_handle") =    \
+        &viper_app_dso_handle_;                                                                    \
     extern "C" const viper_app_t *app_main(void) { return &(descriptor); }
 #else
-#define VIPER_APP(descriptor) \
+#define VIPER_APP(descriptor)                                                                      \
     const viper_app_t *app_main(void) { return &(descriptor); }
 #endif
 
