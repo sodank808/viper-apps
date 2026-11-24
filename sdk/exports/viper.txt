@@ -28,6 +28,7 @@ viper_frame_begin
 viper_frame_mark_dirty
 viper_frame_end
 viper_frame_set_indexed
+viper_frame_set_swap
 
 # Time, random numbers, haptics and the log
 viper_time_us
@@ -52,6 +53,13 @@ viper_api_level
 viper_audio_tap_install
 viper_audio_tap_remove
 viper_audio_sample_rate
+viper_audio_stream_open
+viper_audio_stream_frame
+viper_audio_stream_stretch
+viper_audio_stream_close
+
+# Threads
+viper_thread_create
 
 # Settings and save files (docs/design/app_storage.md)
 viper_prefs_available

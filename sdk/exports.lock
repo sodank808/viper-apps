@@ -414,6 +414,10 @@ viper_app_launch 1
 viper_app_lvgl_path 1
 viper_app_path 1
 viper_audio_sample_rate 1
+viper_audio_stream_close 5
+viper_audio_stream_frame 5
+viper_audio_stream_open 5
+viper_audio_stream_stretch 5
 viper_audio_tap_install 1
 viper_audio_tap_remove 1
 viper_battery_charging 1
@@ -430,6 +434,7 @@ viper_frame_begin 1
 viper_frame_end 1
 viper_frame_mark_dirty 1
 viper_frame_set_indexed 1
+viper_frame_set_swap 6
 viper_gfx_bench 1
 viper_haptic 1
 viper_imu_accel 1
@@ -464,6 +469,7 @@ viper_random 1
 viper_test 1
 viper_text_entry_open 4
 viper_text_entry_poll 4
+viper_thread_create 6
 viper_time_local 1
 viper_time_us 1
 write 3
