@@ -46,3 +46,18 @@ target_compile_definitions(viper_sim_app_tests PRIVATE
     VIPER_SIM_NETHACK_DATA="${NETHACK_SIM_DATA}")
 target_include_directories(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/nethack/main
     ${VIPER_ROOT}/components/raycast/include)
+
+# Genesis: the machine (genesis_core.cpp and gwenesis) for its unit tests,
+# with the test ROMs' facts (smoke_md.h) from the firmware repo's sim/tests
+file(GLOB genesis_gwenesis_srcs CONFIGURE_DEPENDS ${VIPER_PUBLIC_APPS}/genesis/main/gwenesis/*.c)
+if(VIPER_SIM_SANITIZE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # gwenesis reads emulated memory through 16- and 32-bit pointers at any
+    # even address, as nofrendo does (the firmware repo's sim/CMakeLists.txt
+    # does the same for the copy compiled into the simulator)
+    set_source_files_properties(${genesis_gwenesis_srcs} PROPERTIES
+        COMPILE_OPTIONS -fno-sanitize=alignment)
+endif()
+target_sources(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/genesis/tests/test_genesis.cpp
+    ${VIPER_PUBLIC_APPS}/genesis/main/genesis_core.cpp ${genesis_gwenesis_srcs})
+target_include_directories(viper_sim_app_tests PRIVATE ${VIPER_PUBLIC_APPS}/genesis/main
+    ${VIPER_ROOT}/sim/tests/roms/genesis)
