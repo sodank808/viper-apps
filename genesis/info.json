@@ -1,0 +1,8 @@
+{
+    "name": "Genesis",
+    "shortname": "Genesis",
+    "type": "EMULATOR",
+    "url": "genesis://",
+    "extensions": [".md", ".gen", ".smd"],
+    "icon_path": "icon.png"
+}
