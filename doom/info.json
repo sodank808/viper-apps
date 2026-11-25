@@ -2,6 +2,7 @@
     "name": "Doom",
     "shortname": "Doom",
     "type": "EMULATOR",
+    "category": "Games",
     "url": "doom://",
     "extensions": [".wad"],
     "icon_path": "icon.png"
