@@ -2,6 +2,7 @@
     "name": "NetHack",
     "shortname": "NetHack",
     "type": "NATIVE",
+    "category": "Games",
     "url": "elf://app.viper.nethack",
     "icon_path": "icon.png"
 }

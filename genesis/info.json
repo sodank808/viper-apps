@@ -2,6 +2,7 @@
     "name": "Genesis",
     "shortname": "Genesis",
     "type": "EMULATOR",
+    "category": "Emulators",
     "url": "genesis://",
     "extensions": [".md", ".gen", ".smd"],
     "icon_path": "icon.png"
