@@ -67,6 +67,20 @@ public:
     static constexpr uint32_t DST_ALPHA = 0x0304;
     static constexpr uint32_t ONE_MINUS_DST_ALPHA = 0x0305;
 
+    // Face culling (cullFace, frontFace)
+    static constexpr uint32_t FRONT = 0x0404;
+    static constexpr uint32_t BACK = 0x0405;
+    static constexpr uint32_t FRONT_AND_BACK = 0x0408;
+    static constexpr uint32_t CW = 0x0900;
+    static constexpr uint32_t CCW = 0x0901;
+
+    /// What the rasterizer did since the last resetStats(), for profiling
+    struct Stats {
+        uint32_t triangles = 0; ///< rasterized (after clipping and culling)
+        uint32_t culled = 0;    ///< dropped by face culling
+        uint32_t fragments = 0; ///< pixels covered, before the depth test
+    };
+
     // Matrix types. Matrices are column-major like OpenGL: the element in row
     // r, column c is m[c * 4 + r], and they transform column vectors
     // (v' = M * v), so the translation is in m[12], m[13], m[14].
@@ -144,8 +158,17 @@ public:
     // Rendering state
     void clearColor(float r, float g, float b, float a = 1.0f);
     void clear(uint32_t mask);
+    /// DEPTH_TEST, BLEND or CULL_FACE (the others are ignored)
     void enable(uint32_t cap);
     void disable(uint32_t cap);
+    /// Which faces CULL_FACE drops: BACK (the default), FRONT or FRONT_AND_BACK
+    void cullFace(uint32_t mode) { cull_mode_ = mode; }
+    /// Which winding is the front: CCW (the default, as seen on screen) or CW
+    void frontFace(uint32_t mode) { front_face_ = mode; }
+    void enableCulling(bool enable) { cull_enabled_ = enable; }
+
+    const Stats& stats() const { return stats_; }
+    void resetStats() { stats_ = {}; }
     void lineWidth(float width);
     void color3f(float r, float g, float b);
     void color4f(float r, float g, float b, float a);
@@ -159,6 +182,12 @@ public:
     // Immediate mode drawing
     void drawLine(const Vector3& start, const Vector3& end, const ColorRGBA& color);
     void drawTriangle(const Vertex& v1, const Vertex& v2, const Vertex& v3);
+    /// A mesh: triangles made of vertices[indices[i]], vertices[indices[i + 1]],
+    /// vertices[indices[i + 2]], for every whole triple in indices. Each vertex
+    /// is transformed once however many triangles share it, so this is much
+    /// faster than drawTriangle() for meshes. Out-of-range indices are skipped.
+    void drawIndexedTriangles(const Vertex* vertices, size_t vertex_count,
+                              const uint16_t* indices, size_t index_count);
     void drawTriangleBarycentric(int x1, int y1, int x2, int y2, int x3, int y3, const ColorRGBA& c1, const ColorRGBA& c2, const ColorRGBA& c3);
     void drawWireframeCube(float size, const ColorRGBA& color);
     void drawSolidCube(float size, const ColorRGBA& color);
@@ -183,7 +212,11 @@ public:
     // Depth buffer control
     void enableDepthTest(bool enable);
     void clearDepth();
-    float* getDepthBuffer() const { return depth_buffer_.get(); }
+    /// 16-bit depth, 0 at the near plane to kDepthMax at the far one (and
+    /// beyond); clearDepth() sets it to 0xFFFF. clearDepth() resets only what
+    /// EspGL wrote since the last clear, so don't write to it yourself.
+    uint16_t* getDepthBuffer() const { return depth_buffer_.get(); }
+    static constexpr uint16_t kDepthMax = 0xFFFE;
     
     // Blending control
     void enableBlending(bool enable);
@@ -221,7 +254,10 @@ private:
     bool hw_accel_enabled_;
     
     // Depth buffer
-    std::unique_ptr<float[]> depth_buffer_; ///< Z-buffer for depth testing
+    std::unique_ptr<uint16_t[]> depth_buffer_; ///< Z-buffer for depth testing
+    // The part of the depth buffer written since it was last cleared, which
+    // is all clearDepth() has to reset (empty when x0 >= x1)
+    int depth_dirty_x0_ = 0, depth_dirty_y0_ = 0, depth_dirty_x1_ = 0, depth_dirty_y1_ = 0;
     bool depth_test_enabled_; ///< True if depth test is enabled
     
     // Blending state
@@ -229,7 +265,19 @@ private:
     uint32_t blend_src_factor_; ///< Source blend factor
     uint32_t blend_dst_factor_; ///< Destination blend factor
     
-    Matrix4x4& currentMatrix();
+    // Face culling
+    bool cull_enabled_ = false;
+    uint32_t cull_mode_ = BACK;
+    uint32_t front_face_ = CCW;
+
+    Stats stats_;
+
+    // projection * modelview, rebuilt when either changes
+    mutable Matrix4x4 mvp_{};
+    mutable bool mvp_dirty_ = true;
+    const Matrix4x4& mvp() const;
+
+    Matrix4x4& currentMatrix(); // marks the MVP dirty
     std::vector<Matrix4x4>& currentStack();
 
     // A vertex after the projection: clip coordinates and its color
@@ -245,6 +293,10 @@ private:
         std::array<float, 4> color;
     };
     ScreenVertex toScreen(const ClipVertex& v) const;
+    void drawClipTriangle(const ClipVertex& c1, const ClipVertex& c2, const ClipVertex& c3);
+    // drawIndexedTriangles()'s transformed vertices, kept to save allocating each call
+    std::vector<ClipVertex> clip_scratch_;
+    std::vector<ScreenVertex> screen_scratch_;
     void rasterizeTriangle(const ScreenVertex& v1, const ScreenVertex& v2, const ScreenVertex& v3);
 
     // Rasterization
