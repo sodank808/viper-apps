@@ -140,12 +140,14 @@ std::vector<int16_t> render(const RenderRequest &request, RenderResult *result) 
     while (!renderer.done()) {
         renderer.process(pcm.data() + renderer.frames_rendered(), 4096);
     }
-    pcm.resize(renderer.result().frames);
-    pcm.shrink_to_fit();
     if (result) {
         *result = renderer.result();
     }
-    return pcm;
+    // A copy the size of the sound, so the max_seconds buffer is freed here.
+    // Not shrink_to_fit(): without exceptions (the firmware, ELF apps) it does
+    // nothing, and every voice kept its whole buffer (480 KB at 48 kHz).
+    const auto frames = static_cast<std::ptrdiff_t>(renderer.result().frames);
+    return std::vector<int16_t>(pcm.begin(), pcm.begin() + frames);
 }
 
 } // namespace drum
