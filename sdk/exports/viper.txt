@@ -17,9 +17,11 @@ viper_app_lvgl_path
 viper_app_exit
 viper_app_handle_back
 viper_app_launch
+viper_app_open_url
 viper_app_argc
 viper_app_arg
 viper_app_keep_awake
+viper_theme_accent
 
 # The screen, for VIPER_RENDER_VIDEO_BLIT apps
 viper_display_width
@@ -27,6 +29,7 @@ viper_display_height
 viper_frame_begin
 viper_frame_mark_dirty
 viper_frame_end
+viper_frame_swap
 viper_frame_set_indexed
 viper_frame_set_swap
 
