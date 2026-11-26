@@ -1,9 +1,11 @@
 # libc for ELF apps, beyond the table in src/esp_elf_symbol.c. Format: see
 # viper.txt.
 #
-# fopen and fclose (and opendir and closedir) go through
+# fopen and fclose (and opendir, readdir, closedir and stat) go through
 # components/system/src/elf_files.cpp, which closes the files and directories
-# an app leaves open when it closes, as the loader frees the memory it doesn't.
+# an app leaves open when it closes, as the loader frees the memory it doesn't,
+# and reads paths that run through a .zip or .vapp file from inside it
+# (components/zip).
 
 # stdio.h: reading files
 fopen = viper_elf_fopen
@@ -21,14 +23,15 @@ rename
 # Formatting into a buffer, beside the table's snprintf (Doom's menus)
 sprintf
 
-# sys/stat.h and dirent.h. opendir and closedir go through elf_files.cpp too,
-# so a directory left open is closed with the app.
+# sys/stat.h and dirent.h. opendir, readdir, closedir and stat go through
+# elf_files.cpp too, so a directory left open is closed with the app, and
+# folders inside archives list and stat.
 mkdir
-stat
+stat = viper_elf_stat
 # unistd.h: whether a file is there (Doom looks for its WADs and demos)
 access
 opendir = viper_elf_opendir
-readdir
+readdir = viper_elf_readdir
 closedir = viper_elf_closedir
 
 # pthread.h: what the libc table (pthread_create, _join, ...) lacks, for an
