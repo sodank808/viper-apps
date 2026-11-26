@@ -68,7 +68,7 @@ extern "C" {
  * arrived in, check_app_elf.py reports the level an app needs, and its
  * installed info.json says so as "min_api". viper_api_level() is the running
  * firmware's. Written by check_exports_lock.py --update; don't edit. */
-#define VIPER_API_LEVEL 6
+#define VIPER_API_LEVEL 8
 
 typedef enum {
     VIPER_RENDER_LVGL = 0,       /* build an LVGL UI under the container */
@@ -171,6 +171,13 @@ void viper_app_handle_back(int handle);
  * app `bundle_id`. */
 bool viper_app_launch(const char *bundle_id, const char *const *argv, int argc);
 
+/* viper_app_launch() for a URL: closes this app and opens `url` with the app
+ * that handles its scheme, e.g. "gbc:///sdcard/roms/lsdj.gb" opens that ROM
+ * in the Game Boy emulator. When that app closes, this one opens again with
+ * `argv` as its arguments, as with viper_app_launch(). Returns false, and does
+ * nothing, when no app handles the scheme. New in API level 7. */
+bool viper_app_open_url(const char *url, const char *const *argv, int argc);
+
 /* The arguments the app was opened with: those an app it launched with
  * viper_app_launch() handed back, or none (argc 0) from the home screen.
  * viper_app_arg() is NULL for an `i` outside 0 to argc - 1. Valid from
@@ -232,6 +239,12 @@ bool viper_imu_gyro(float xyz[3]);
  * without input. It lasts until changed, or the app closes. Turn it off when
  * nothing is happening: it costs battery. */
 void viper_app_keep_awake(int on);
+
+/* The accent color of the theme picked in Settings, as 0xRRGGBB, for the
+ * focus and selection in an app that looks like the system's own (the system
+ * UI kit's greys are fixed: components/ui/include/ui_theme.hpp). Read it in
+ * create(); it changes only in Settings. New in API level 7. */
+uint32_t viper_theme_accent(void);
 
 /* The device's state, for a status readout. viper_battery_level() is the
  * battery's charge, 0-100, as the system's battery icon shows it (a board
@@ -395,6 +408,15 @@ uint32_t viper_display_height(void);
 uint16_t *viper_frame_begin(void);
 void viper_frame_mark_dirty(int x, int y, int width, int height);
 void viper_frame_end(int flush_all);
+/* viper_frame_end(0) for an app that redraws everything it marks, every
+ * frame (an emulator's picture): the next frame doesn't start from this one.
+ * viper_frame_end() copies what was marked into the buffer the next frame is
+ * drawn in, so a frame starts from the last; at 320x224 that copy is about
+ * 15 ms. viper_frame_swap() leaves it out, so the next viper_frame_begin()
+ * returns the frame from before this one (or what was on the screen before
+ * the app's first frames): draw everything you mark, and anything drawn once
+ * (borders) in two frames running. New in API level 8. */
+void viper_frame_swap(void);
 
 /* Indexed frames, for emulators and other apps that draw with a palette: the
  * display stretches a smaller picture to the screen, as scan-out does for the

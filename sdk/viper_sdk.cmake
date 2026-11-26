@@ -78,12 +78,12 @@ macro(_viper_elf_setup)
     # Game libraries the app asked for with set(VIPER_LIBS ...) before
     # project_elf(): platform-free code shared with built-in apps and the sim
     # (docs/plans/game_api_consolidation.md). This adds their include
-    # folders; the sim reads the same line (sim/CMakeLists.txt). All but wfc
-    # and drum_synth are header-only: an app using one of those lists its
-    # src/*.cpp in its own SRCS (apps/screensavers/circuit/CMakeLists.txt,
-    # apps/drum_machine/main/CMakeLists.txt), and the sim links the firmware's
-    # copy.
-    set(viper_known_libs gfx game sfx espgl wfc drum_synth raycast)
+    # folders; the sim reads the same line (sim/CMakeLists.txt). All but wfc,
+    # drum_synth, z80 and ym2151 are header-only: an app using one of those lists its
+    # src/ files in its own SRCS (apps/screensavers/circuit/CMakeLists.txt,
+    # apps/drum_machine/main/CMakeLists.txt, apps/tmnt/main/CMakeLists.txt),
+    # and the sim links the firmware's copy.
+    set(viper_known_libs gfx game sfx espgl wfc drum_synth raycast z80 ym2151)
     foreach(lib IN LISTS VIPER_LIBS)
         if(NOT lib IN_LIST viper_known_libs)
             message(FATAL_ERROR "VIPER_LIBS: unknown library '${lib}' (known: ${viper_known_libs})")
